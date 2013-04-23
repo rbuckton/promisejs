@@ -7,7 +7,12 @@
 * Author: Ron Buckton (rbuckton@chronicles.org)
 * ----------------------------------------------------------------------
 */
-void function (window, undefined) {
+(function (definition) {
+    if (typeof Future === "undefined") {
+        definition(window);
+    }
+})
+(function (window, undefined) {
     var _es5 = typeof Function.prototype.bind === "function" &&
                typeof Object.create === "function" &&
                typeof Object.defineProperty === "function",
@@ -62,9 +67,11 @@ void function (window, undefined) {
     var Symbol = function() {    
         /** Creates a new pseudo-private-symbol object
           * @class
+          * @param predefined {String} A predefined symbol string. This can be used to create symbols that are portable between realms (e.g. IFrames)
           */
-        function Symbol() { 
-            this._sym = "@@Symbol@" + Math.random().toString(36).slice(2); 
+        function Symbol(predefined) { 
+            this._sym = "@@Symbol@" + (predefined == null ? Math.random().toString(36).slice(2) : predefined); 
+            console.log(this._sym);
         }
         
         if (_es5) {
@@ -157,6 +164,7 @@ void function (window, undefined) {
             /** Gets a value indicating whether the symbol has been defined for the object
               * @param obj {Object} The object to test for presence of the symbol
               * @returns {Boolean} True if the symbol is defined; otherwise, false.
+              * @remarks This won't be able to read across realms in non ES5 browsers.
               */
             Symbol.prototype.has = function (obj) {
                 if (Object(obj) !== obj) throw new TypeError("Invalid argument: obj");
@@ -168,7 +176,7 @@ void function (window, undefined) {
                     obj.valueOf();
                     if (symbolValue) {
                         return true;
-                    }
+                    }                    
                     return false;
                 }
                 finally {
@@ -210,7 +218,10 @@ void function (window, undefined) {
         return Countdown;
     }();
 
-    // private symbol for the FutureData internal data property
+    // private symbol to brand a Future between realms
+    var __FutureBrand__ = new Symbol("[[Future]]");
+    
+    // private symbol for the FutureData internal data property. Using a predefined symbol as this is used to brand Future
     var __FutureData__ = new Symbol();
 
     // private symbol for the FutureResolverData internal data property
@@ -380,6 +391,9 @@ void function (window, undefined) {
             // private storage object
             var data = new FutureData();
             __FutureData__.set(this, data);
+            
+            // brand the future
+            __FutureBrand__.set(this);
 
             // initialize the future
             var resolver = _create(FutureResolver.prototype);
@@ -586,7 +600,7 @@ void function (window, undefined) {
                 return true;
             }
             
-            if (Object(value) === value && __FutureData__.has(value)) {
+            if (Object(value) === value && __FutureBrand__.has(value)) {
                 return true;
             }
             
@@ -766,4 +780,4 @@ void function (window, undefined) {
     window.Future = Future;
     window.Deferred = Deferred;
 
-}(this);
+});
