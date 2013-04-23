@@ -273,7 +273,7 @@
           * @param value {any} The value for the completion.
           */
         FutureData.prototype.complete = function (verb, value) {
-            if (verb !== VERB_ACCEPT && value instanceof Future) {
+            if (verb !== VERB_ACCEPT && Future.isFuture(value)) {
                 try {
                     value.done(
                         _bind(this.complete, this, verb),
@@ -281,7 +281,7 @@
                     );
                 }
                 catch (e) {
-                    this.complete(VERB_REJECT, e);
+                    this.when(VERB_REJECT, e);
                 }
             }
             else {
