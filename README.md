@@ -25,6 +25,8 @@ Some consideration is begin given to the following areas:
     * Should cancellation only effect the target Future and its chained descendants?
     * Should cancellation support subscription to perform cancellation cleanup (e.g. XMLHttpRequest#abort, Worker#close, etc.)
   * Should cancellation be performed by providing an external Future to use for cancellation? e.g.:
+
+<pre>
     function fetchAsync(url, token) {
       return new Future(function (resolver) {
         var xhr = new XMLHttpRequest();
@@ -45,3 +47,4 @@ Some consideration is begin given to the following areas:
     
     // wait 500ms then cancel
     Future.sleep(500).done(cts.resolve);
+</pre>
