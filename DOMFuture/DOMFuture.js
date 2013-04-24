@@ -123,18 +123,9 @@
             Symbol.prototype.get = function (obj) {
                 if (Object(obj) !== obj) throw new TypeError("Invalid argument: obj");
                 
-                var previousKey = symbolKey;
-                symbolKey = this._sym;
-                symbolValue = undefined;
-                try {
-                    obj.valueOf();
-                    if (symbolValue) {
-                        return symbolValue.value;
-                    }
-                }
-                finally {
-                    symbolKey = previousKey;
-                    symbolValue = null;
+                var symbolValue = obj.valueOf(this._sym);
+                if (symbolValue) {
+                    return symbolValue.value;
                 }
             }
 
@@ -144,45 +135,28 @@
               */
             Symbol.prototype.set = function (obj, value) {
                 if (Object(obj) !== obj) throw new TypeError("Invalid argument: obj");
-                
-                var previousKey = symbolKey;
-                symbolKey = this._sym;
-                symbolValue = undefined;
-                try {
-                    obj.valueOf();
-                    if (!symbolValue) {
-                        obj.valueOf = addSymbolReader(this._sym, obj.valueOf);
-                    }
-                    symbolValue.value = value;
+            
+                var symbolValue = obj.valueOf(this._sym);
+                if (!symbolValue) {
+                    obj.valueOf = addSymbolReader(this._sym, obj.valueOf);
+                    symbolValue = obj.valueOf(this._sym);
                 }
-                finally {
-                    symbolKey = previousKey;
-                    symbolValue = null;
-                }                
+                
+                symbolValue.value = value;
             }
 
             /** Gets a value indicating whether the symbol has been defined for the object
               * @param obj {Object} The object to test for presence of the symbol
               * @returns {Boolean} True if the symbol is defined; otherwise, false.
-              * @remarks This won't be able to read across realms in non ES5 browsers.
               */
             Symbol.prototype.has = function (obj) {
                 if (Object(obj) !== obj) throw new TypeError("Invalid argument: obj");
                 
-                var previousKey = symbolKey;
-                symbolKey = this._sym;
-                symbolValue = undefined;
-                try {
-                    obj.valueOf();
-                    if (symbolValue) {
-                        return true;
-                    }                    
-                    return false;
-                }
-                finally {
-                    symbolKey = previousKey;
-                    symbolValue = null;
-                }
+                var symbolValue = obj.valueOf(this._sym);
+                if (symbolValue) {
+                    return true;
+                }                    
+                return false;
             }
         }
         Symbol.prototype.toString = function () { throw new TypeError(); }
@@ -190,13 +164,11 @@
         
         // private storage reader for pre-ES5 engines
         // uses variables in the function scope to protect against unwanted readers.
-        var symbolKey;
-        var symbolValue;
         function addSymbolReader(sym, valueOf) {
             var value = { };
-            return function() {
-                if (symbolKey === sym) {
-                    symbolValue = value;
+            return function(key) {
+                if (key === sym) {
+                    return value;
                 }
                 return valueOf.apply(this, arguments);
             }
@@ -329,6 +301,10 @@
             if (resolver) {
                 resolver[verb](value);
             }
+            else if (VERB_REJECT) {
+                // need e to be thrown to window.onerror
+                Dispatcher.post(function() { throw e; });
+            }
         }
                 
         return FutureData;
@@ -447,7 +423,7 @@
           * The reject callback is invoked when this Future is rejected. The argument to the reject callback is the error for this Future.
           * The return value of the reject callback becomes the resolved value for the chained Future. 
           * If an error is thrown during the reject callback, the chained Future is rejected using the error that was thrown.
-          * If the reject argument is null or undefined, the chained Future will be rejected with the error for this Promise.
+          * If the reject argument is null or undefined, the chained Future will be rejected with the error for this Future.
           *
           * Unhandled exceptions that are not handled by a reject callback will not propagate to the host. 
           * To handle these exceptions you must either create a new chained Future that handles the reject callback, or call Future#done.
@@ -480,14 +456,35 @@
 
             return new Future(function (resolver) { futureData.chain(resolver, null, reject, options) });
         }
+        
+        /** A short form for Future#then that uses the same callback for both resolve and reject.
+          * @param callback {Function} The callback to execute when the parent Future is either resolved or rejected. 
+          * @param options {Object} An object whose own properties are used to supply additional options for the chained Future.
+          * @return A new chained Future.
+          *
+          * The callback is invoked when this Future is resolved or rejected. No arguments are passed to the callback.
+          * The return value of the callback becomes the resolved value for the chained Future. 
+          * If an error is thrown during the callback, the chained Future is rejected using the error that was thrown.
+          * If the callback argument is null or undefined, the chained Future will be resolved or rejected with the same value or error as this Future.
+          *
+          * Unhandled exceptions in the callback will not propagate to the host. 
+          * To handle these exceptions you must either create a new chained Future that handles the reject callback, or call Future#done.
+          */
+        Future.prototype["finally"] = function (callback, options) {
+            var futureData = __FutureData__.get(this);
+            if (!futureData) throw new TypeError("'this' is not a Future object");
+            
+            var _callback = function() { return callback(); };
+            return new Future(function (resolver) { futureData.chain(resolver, _callback, _callback, options); });
+        }
                 
         /** Converts the value provided into a Future.  If the value has a callable data property named "then", it is used to coerce the value to a Future; otherwise, a new Future is returned that is resolved with the provided value.
-          * @param value {any} The value to convert to a Promise.
+          * @param value {any} The value to coerce to a Future.
           * @returns {Future} A Future for the value.
           * @remarks This is an extension to the DOMFutures specification
           */
         Future.of = function (value) {
-            if (value instanceof Future) return value;
+            if (Future.isFuture(value)) return value;
             if (value && typeof value.then === "function") {
                 return new Future(function (resolver) {
                     if (typeof value.done === "function") { // try to use done if possible
@@ -502,11 +499,11 @@
         }
         
         /** Converts the value provided into a Future.  If the value is already a Future, it is returned; otherwise, a new Future is returned that is resolved with the provided value.
-          * @param value {any} The value to convert to a Promise.
+          * @param value {any} The value to convert to a Future.
           * @returns {Future} A Future for the value.
           */
         Future.resolve = function (value) {
-            if (value instanceof Future) return value;
+            if (Future.isFuture(value)) return value;
             return new Future(function (resolver) { resolver.accept(value); });
         }
         
@@ -531,10 +528,13 @@
                     resolver.resolve();
                 }
                 else {
-                    var resolve = _bind(resolver.resolve, resolver);
-                    var reject = _bind(resolver.reject, resolver);
                     for (var i = 0, l = futures.length; i < l; i++) {
-                        Future.of(futures[i]).done(resolve, reject, { synchronous: true });
+                        Future
+                            .resolve(futures[i])
+                            .done(
+                                resolver.resolve, 
+                                resolver.reject, 
+                                { synchronous: true });
                     }
                 }
             });
@@ -547,19 +547,23 @@
           * Any value that is not a Future is resolved as a Future by calling the Future.of() function.
           * If the new Future is rejected, the order of the errors in the result will be the same as the order of the Futures provided to Future.some.
           */
-        Future.some = function () {
+        Future.some = function (/*...futures*/) {
             var futures = _toArray(arguments);
             return new Future(function (resolver) {
                 if (futures.length === 0) {
                     resolver.resolve();
                 }
                 else {
-                    var resolve = _bind(resolver.resolve, resolver);
                     var errors = new Array(futures.length);
                     var countdown = new Countdown(futures.length);
                     for (var i = 0, l = futures.length; i < l; i++) {
                         var reject = makeCallback(countdown, errors, i, resolver, VERB_RESOLVE);
-                        Future.of(futures[i]).done(resolve, reject, { synchronous: true });
+                        Future
+                            .resolve(futures[i])
+                            .done(
+                                resolver.resolve, 
+                                reject, 
+                                { synchronous: true });
                     }
                 }
             });
@@ -572,19 +576,23 @@
           * Any value that is not a Future is resolved as a Future by calling the Future.of() function.
           * When the new Future is resolved, the order of the values in the result will be the same as the order of the Futures provided to Future.every.
           */
-        Future.every = function () {
+        Future.every = function (/*...futures*/) {
             var futures = _toArray(arguments);
             return new Future(function (resolver) {
                 if (futures.length === 0) {
                     resolver.resolve([]);
                 }
                 else {
-                    var reject = _bind(resolver.reject, resolver);
                     var values = new Array(futures.length);
                     var countdown = new Countdown(futures.length);
                     for (var i = 0, l = futures.length; i < l; i++) {
                         var resolve = makeCallback(countdown, values, i, resolver, VERB_REJECT);
-                        Future.of(futures[i]).done(resolve, reject, { synchronous: true });
+                        Future
+                            .resolve(futures[i])
+                            .done(
+                                resolve, 
+                                resolver.reject, 
+                                { synchronous: true });
                     }
                 }
             });
@@ -613,7 +621,7 @@
           */
         Future.yield = function() {
             return new Future(function(resolver) { 
-                Dispatcher.post(_bind(resolver.resolve, resolver)); 
+                Dispatcher.post(resolver.accept); 
             });
         }
 
@@ -624,25 +632,37 @@
           */
         Future.sleep = function(ms) {
             return new Future(function(resolver) {
-                setTimeout(_bind(resolver.resolve), ms);
+                setTimeout(resolver.accept, ms);
             });
         }
         
         /** Creates a Future that resolves only after a callback results to true.
           * @param func {Function} The callback to execute to evaluate whether to continue sleeping.
-          * @param ms {Number} Optional. The number of milliseconds to wait between checks. If the argument is null or undefined, the test will be checked every turn of the runtime's dispatcher.
-          * @returns {Future}
+          * @param interval {Number} Optional. The number of milliseconds to wait between checks. If the argument is null or undefined, the test will be checked every turn of the runtime's dispatcher.
+          * @param timeout {Number} Optional. The number of milliseconds to wait
+          * @returns {Future} A Future that resolves to <b>true</b> when the callback returns true, or <b>false</b> if the timeout elapsed prior to the condition being met.
           * @remarks This is an extension to the DOMFutures specification. This is primarily useful in an "async/await" style function to wait for a specific result.
           */
-        Future.sleepUntil = function(func, ms) {
-            return new Future(function(resolver) {                
+        Future.sleepUntil = function(func, interval, timeout) {            
+            return new Future(function(resolver) {
+                var done = false;
+                
+                if (timeout != null) {
+                    setTimeout(function() {
+                        done = true;
+                        resolver.accept(false);
+                    }, timeout);
+                }
+                
                 var callback = function() {
+                    if (done) return;
+                    
                     try {
                         if (func()) {
-                            resolver.resolve();
+                            resolver.accept(true);
                         }
                         else {
-                            if (ms == null) {
+                            if (interval == null) {
                                 Dispatcher.post(callback);
                             }
                             else {
@@ -655,11 +675,11 @@
                     }
                 }
                 
-                if (ms == null) {
+                if (interval == null) {
                     callback();
                 }
                 else {
-                    setTimeout(callback, ms);
+                    setTimeout(callback, interval);
                 }
             });
         }
