@@ -9,10 +9,10 @@
 */
 (function (definition) {
     if (typeof Future === "undefined") {
-        definition(window);
+        definition(window, Symbol);
     }
 })
-(function (window, undefined) {
+(function (window, Symbol, undefined) {
     var _es5 = typeof Function.prototype.bind === "function" &&
                typeof Object.create === "function" &&
                typeof Object.defineProperty === "function",
@@ -64,119 +64,6 @@
         }
     }();
     
-    var Symbol = function() {    
-        /** Creates a new pseudo-private-symbol object
-          * @class
-          * @param predefined {String} A predefined symbol string. This can be used to create symbols that are portable between realms (e.g. IFrames)
-          */
-        function Symbol(predefined) { 
-            this._sym = "@@Symbol@" + (predefined == null ? Math.random().toString(36).slice(2) : predefined); 
-            console.log(this._sym);
-        }
-        
-        if (_es5) {
-            /** Gets the value of the symbol on the object
-              * @param obj {Object} The object from which to read the symbol value
-              * @returns The value of the symbol on the object
-              */
-            Symbol.prototype.get = function (obj) { 
-                if (Object(obj) !== obj) throw new TypeError("Invalid argument: obj");
-
-                var desc = Object.getOwnPropertyDescriptor(obj, this._sym);
-                if (desc != null) {
-                    return desc.value;
-                }
-            }
-
-            /** Sets the value of the symbol on the object
-              * @param obj {Object} The object to which to write the symbol value
-              * @param value The value to set
-              */
-            Symbol.prototype.set = function (obj, value) { 
-                if (Object(obj) !== obj) throw new TypeError("Invalid argument: obj");
-
-                var desc = Object.getOwnPropertyDescriptor(obj, this._sym);
-                if (desc == null) {
-                    desc = { writable: true, value: value };
-                    Object.defineProperty(obj, this._sym, desc);
-                }
-                else {
-                    obj[this._sym] = value;
-                }
-            }
-
-            /** Gets a value indicating whether the symbol has been defined for the object
-              * @param obj {Object} The object to test for presence of the symbol
-              * @returns {Boolean} True if the symbol is defined; otherwise, false.
-              */
-            Symbol.prototype.has = function (obj) { 
-                if (Object(obj) !== obj) throw new TypeError("Invalid argument: obj");
-
-                return !!Object.getOwnPropertyDescriptor(obj, this._sym);
-            }
-        } 
-        else {
-            /** Gets the value of the symbol on the object
-              * @param obj {Object} The object from which to read the symbol value
-              * @returns The value of the symbol on the object
-              */
-            Symbol.prototype.get = function (obj) {
-                if (Object(obj) !== obj) throw new TypeError("Invalid argument: obj");
-                
-                var symbolValue = obj.valueOf(this._sym);
-                if (symbolValue) {
-                    return symbolValue.value;
-                }
-            }
-
-            /** Sets the value of the symbol on the object
-              * @param obj {Object} The object to which to write the symbol value
-              * @param value The value to set
-              */
-            Symbol.prototype.set = function (obj, value) {
-                if (Object(obj) !== obj) throw new TypeError("Invalid argument: obj");
-            
-                var symbolValue = obj.valueOf(this._sym);
-                if (!symbolValue) {
-                    obj.valueOf = addSymbolReader(this._sym, obj.valueOf);
-                    symbolValue = obj.valueOf(this._sym);
-                }
-                
-                symbolValue.value = value;
-            }
-
-            /** Gets a value indicating whether the symbol has been defined for the object
-              * @param obj {Object} The object to test for presence of the symbol
-              * @returns {Boolean} True if the symbol is defined; otherwise, false.
-              */
-            Symbol.prototype.has = function (obj) {
-                if (Object(obj) !== obj) throw new TypeError("Invalid argument: obj");
-                
-                var symbolValue = obj.valueOf(this._sym);
-                if (symbolValue) {
-                    return true;
-                }                    
-                return false;
-            }
-        }
-        Symbol.prototype.toString = function () { throw new TypeError(); }
-        Symbol.prototype.valueOf = function () { throw new TypeError(); }
-        
-        // private storage reader for pre-ES5 engines
-        // uses variables in the function scope to protect against unwanted readers.
-        function addSymbolReader(sym, valueOf) {
-            var value = { };
-            return function(key) {
-                if (key === sym) {
-                    return value;
-                }
-                return valueOf.apply(this, arguments);
-            }
-        }
-
-        return Symbol;
-    }();
-
     var Countdown = function () {
         /** A countdown event
           * @param count {Number} The number of times the event must signal before it completes
@@ -301,7 +188,7 @@
             if (resolver) {
                 resolver[verb](value);
             }
-            else if (VERB_REJECT) {
+            else if (verb === VERB_REJECT) {
                 // need e to be thrown to window.onerror
                 Dispatcher.post(function() { throw e; });
             }
