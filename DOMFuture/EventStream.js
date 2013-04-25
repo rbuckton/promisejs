@@ -1,3 +1,12 @@
+/*! 
+* This source is subject to the Microsoft Public License.
+* See http://www.microsoft.com/opensource/licenses.mspx#Ms-PL.
+* All other rights reserved.
+* ----------------------------------------------------------------------
+* Version: 1.0.0.0
+* Author: Ron Buckton (rbuckton@chronicles.org)
+* ----------------------------------------------------------------------
+*/
 // @requires Symbol.js
 // @requires DOMFuture.js
 (function (definition) {
