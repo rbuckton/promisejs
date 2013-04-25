@@ -72,8 +72,15 @@
             /** Signals a countdown event
               * @returns {Boolean} True if the countdown has completed; otherwise, false
               */
-            this.set = function () { return --count <= 0; }
+            this.set = function () { 
+                if (count > 0) {
+                    return --count <= 0; 
+                }
+                
+                return true;
+            }
         }
+        
         return Countdown;
     }();
 
@@ -90,7 +97,9 @@
         /** Internal storage for a Future and its FutureResolver
           * @class
           */
-        function FutureData() {
+        function FutureData(future, resolver) {
+            this.future = future;
+            this.resolver = resolver;
             this.completed = false;
         }
         
@@ -101,15 +110,16 @@
           * @param options {Object} An optional object providing additional options for creating the chained future.
           */
         FutureData.prototype.chain = function (resolver, resolve, reject, options) {
-            var prev = this.when;
-            this.when = function (verb, value) {
-                prev.call(this, verb, value);
+            var link = function (verb, value) {
+                self.next.call(this, verb, value);
                 if (options && options.synchronous) {
                     forward(resolver, verb, value, resolve, reject);
                 } else {
                     Dispatcher.post(forward, resolver, verb, value, resolve, reject);
                 }
             }
+            link.next = this.when;            
+            this.when = link;
         }
         
         /** Root of Future completion. This is called when resolve or reject are called on the FutureResolver of the Future.
@@ -132,10 +142,10 @@
           * @param value {any} The value for the completion.
           */
         FutureData.prototype.complete = function (verb, value) {
-            if (verb !== VERB_ACCEPT && Future.isFuture(value)) {
+            if (verb === VERB_RESOLVE && Future.isFuture(value)) {
                 try {
                     value.done(
-                        _bind(this.complete, this, verb),
+                        _bind(this.complete, this, VERB_RESOLVE),
                         _bind(this.complete, this, VERB_REJECT)
                     );
                 }
@@ -158,25 +168,35 @@
             }
             this.completed = true;
             this.complete(verb, value);
-            return this.completed;
+            return true;
         }    
 
         /** Forwards a completion to a chained Future.
-          * @param resolver {FutureResolver} A FutureResolver for a chained descendant Future.
-          * @param verb {String} The completion type of the Future. One of: "accept", "resolve", or "reject".
-          * @param value {any} The value for the completion type
-          * @param resolve {Function} An optional callback to execute when the completion type is "accept" or "resolve"
+          * @param {Future} future  The Future that is forwarding the completion event.
+          * @param {FutureResolver} resolver  A FutureResolver for a chained descendant Future.
+          * @param {String} verb  The completion type of the Future.
+          * @param value  The value for the completion type.
+          * @param {Function} resolve  A callback to execute when the completion type is "accept" or "resolve".
+          * @param {Function} reject  A callback to execute when the completion type is "reject".
           */
         function forward(resolver, verb, value, resolve, reject) {
+            var future = null;
+            if (resolver) {
+                var futureData = __FutureResolverData__.get(resolver);
+                if (futureData) {
+                    future = futureData.future;
+                }
+            }
+            
             try {
                 if (verb === VERB_RESOLVE || verb === VERB_ACCEPT) {
                     if (resolve) {
-                        value = resolve(value);
+                        value = resolve.call(future, value);
                     }
                 } 
                 else {
                     if (reject) {
-                        value = reject(value);
+                        value = reject.call(future, value);
                         verb = VERB_ACCEPT;
                     }
                 }
@@ -185,12 +205,13 @@
                 value = e;
                 verb = VERB_REJECT;
             }
+            
             if (resolver) {
                 resolver[verb](value);
             }
             else if (verb === VERB_REJECT) {
                 // need e to be thrown to window.onerror
-                Dispatcher.post(function() { throw e; });
+                Dispatcher.post(function() { throw value; });
             }
         }
                 
@@ -251,15 +272,15 @@
             if (typeof init !== "function") throw new TypeError("Invalid argument: init");
             if (!(this instanceof Future) || this === Future.prototype) throw new TypeError("'this' is not a Future object");
             
-            // private storage object
-            var data = new FutureData();
-            __FutureData__.set(this, data);
-            
             // brand the future
             __FutureBrand__.set(this);
 
             // initialize the future
             var resolver = _create(FutureResolver.prototype);
+
+            // private storage object
+            var data = new FutureData(this, resolver);
+            __FutureData__.set(this, data);
             __FutureResolverData__.set(resolver, data);
             
             // convenience, bind the resolver functions
@@ -268,7 +289,7 @@
             resolver.reject = _bind(resolver.reject, resolver);
 
             try {
-                init(resolver);
+                init.call(this, resolver);
             }
             catch (e) {
                 data.tryComplete(VERB_REJECT, e);
