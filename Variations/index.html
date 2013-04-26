@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script type="text/javascript" src="Future.js"></script>
+  <script>
+    var a = new Future(function(resolver) { 
+      setTimeout(resolver.resolve, 500, 1); 
+    });
+    var b = a.then(function(_a) { return _a * 2; });
+    b.done(function(_b) { console.log("(b)done: _b=" + _b); });
+    
+    var d = new Future(function (resolver) { setImmediate(function() { resolver.reject(new Error("error")); }); });
+    var e = d.catch(function(err) { console.log("(d)catch: err=" + err); return 4; });
+    e.done(function(_e) { console.log("(e)done: _e=" + _e); });
+    
+    var f = Future.resolve(1);
+    var g = Future.reject("error");
+    
+    Future.any(f, g).done(function(value) {
+      console.log("(f,g)any: value=" + value);
+    }, function (err) {
+      console.error("(f,g)any: err=" + err);
+    });
+
+    Future.any(g, f).done(function(value) {
+      console.error("(g,f)any: value=" + value);
+    }, function (err) {
+      console.log("(g,f)any: err=" + err);
+    });
+    
+    Future.some(f, g).done(function(value) {
+      console.log("(f,g)some: value=" + value);
+    }, function (errs) {
+      console.error("(f,g)some: errs=" + errs);
+    });
+
+    Future.some(g, f).done(function(value) {
+      console.log("(g,f)some: value=" + value);
+    }, function (errs) {
+      console.error("(g,f)some: errs=" + errs);
+    });
+
+    Future.every(f, g).done(function(values) {
+      console.error("(f,g)every: values=" + values);
+    }, function (err) {
+      console.log("(f,g)every: err=" + err);
+    });
+    
+  </script>
+</head>
+<body>
+</body>
+</html>

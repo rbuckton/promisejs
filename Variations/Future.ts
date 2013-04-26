@@ -89,10 +89,10 @@ class FutureResolver {
         future._result = value;
         this._resolved = true;
         if (synchronous) {
-            future._process(future._rejectCallbacks);
+            (<any>Future)._process(future._rejectCallbacks, value);
         }
         else {
-            setImmediate(() => future._process(future.rejectCallbacks));
+            setImmediate(() => (<any>Future)._process(future._rejectCallbacks, value));
         }
     }
 }
@@ -102,8 +102,8 @@ class FutureResolver {
   */
 class Future {
     private _resolver: FutureResolver;
-    private _resolveCallbacks: { (value: any): void; }[];
-    private _rejectCallbacks: { (value: any): void; }[];
+    private _resolveCallbacks: { (value: any): void; }[] = [];
+    private _rejectCallbacks: { (value: any): void; }[] = [];
     private _state: string = "pending";
     private _result: any;
 
@@ -162,7 +162,7 @@ class Future {
             var resolveCallback = value => { resolver.resolve(value) };
             var rejectCallback = value => { resolver.reject(value) };
             if (values.length <= 0) {
-                resolver.resolve(undefined);
+                resolver.accept(undefined);
             }
             else {
                 values.forEach(value => { 

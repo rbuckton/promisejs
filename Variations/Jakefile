@@ -1,0 +1,52 @@
+file("Future.ts");
+file("Tests.ts");
+
+tsc("Future.js", ["Future.ts"], ["Future.ts"]);
+tsc("Tests.js", ["Tests.ts"], ["Tests.ts"]);
+
+task("default", ["test"]);
+task("build", ["Future.js", "Tests.js"]);
+task("test", ["Future.js", "Tests.js", "Future.ts", "Tests.ts", "build"], function() {
+    var cmd = "node Tests.js";
+    console.log(cmd);
+    jake.exec([cmd], function () {
+        complete();
+    }, { printStdout: true, printStderr: true, breakOnError: false });    
+}, { async: true });
+
+function copy(dest, source) {
+    if (!dest) {
+        dest = {};
+    }
+    if (source) {
+        Object.getOwnPropertyNames(source).forEach(function (name) { Object.defineProperty(dest, name, Object.getOwnPropertyDescriptor(source, name)); });
+    }
+    return dest;
+}
+
+function tsc(target, prereqs, sources, options) {
+    options = copy({ target: "ES5" }, options);
+    file(target, prereqs, function () {
+        var cmd = "tsc";
+        if (options.declaration) cmd += " --declaration";
+        if (options.cflowu) cmd += " --cflowu";
+        if (options.comments) cmd += " --comments";
+        if (options.declcomments) cmd += " --declcomments";
+        if (options.target) cmd += " --target " + options.target;
+        if (options.module) cmd += " --module " + options.module;
+        if (options.debug) cmd += " --sourcemap";
+        if (options.outDir) {
+            cmd += " --out " + options.outDir;
+        }
+        else {
+            if (!/^amd$/i.test(options.module)) {
+                cmd += " --out " + target;
+            }
+        }
+        cmd += " " + sources.join(" ");
+        console.log(cmd);
+        jake.exec([cmd], function () {
+            complete();
+        }, { async: true, printStdout: true, printStderr: true, breakOnError: false });
+    }, { async: true });
+}
