@@ -260,77 +260,292 @@ var Future = (function () {
 })();
 eval(require("fs").readFileSync("Future.js"));
 var setImmediate = process.nextTick;
+var assert = require("assert");
 var tests = [
-    function then() {
-        var F = new Future(function (resolver) {
-            setTimeout(resolver.resolve, 500, 1);
-        });
-        F.then(function (v) {
-            return v * 2;
-        }).done(function (v) {
-            console.assert(v == 2, "expected: 2, actual: %s", v);
-        }, function (e) {
-            console.assert(false, e);
+    function Future_accept_value() {
+        Future.accept(1).done(function (v) {
+            return assert.equal(v, 1);
+        }, assert.ifError);
+    }, 
+    function Future_accept_Future() {
+        var F = Future.accept(1);
+        Future.accept(F).done(function (v) {
+            return assert.equal(v, F);
+        }, assert.ifError);
+    }, 
+    function Future_resolve_value() {
+        Future.resolve(1).done(function (v) {
+            return assert.equal(v, 1);
+        }, assert.ifError);
+    }, 
+    function Future_resolve_Future() {
+        var F = Future.accept(1);
+        Future.resolve(F).done(function (v) {
+            return assert.equal(v, 1);
+        }, assert.ifError);
+    }, 
+    function Future_resolve_FutureFuture() {
+        var FF = Future.accept(Future.accept(1));
+        Future.resolve(FF).done(function (v) {
+            return assert.equal(v, 1);
+        }, assert.ifError);
+    }, 
+    function Future_reject_value() {
+        Future.reject("error").done(assert.ifError, function (e) {
+            return assert.equal(e, "error");
         });
     }, 
-    function _catch() {
-        var F = new Future(function (resolver) {
-            setImmediate(function () {
-                resolver.reject(new Error("error"));
-            });
-        });
-        F.catch(function (e) {
-            return 4;
-        }).done(function (v) {
-            console.assert(v === 4, "expected: 4, actual: %s", v);
-        }, function (e) {
-            console.assert(false, e);
+    function Future_reject_Future() {
+        var F = Future.accept("error");
+        Future.reject(F).done(assert.ifError, function (e) {
+            return assert.equal(e, F);
         });
     }, 
-    function any_accept() {
+    function FutureResolver_accept_value() {
+        new Future(function (resolver) {
+            return resolver.accept(1);
+        }).done(function (v) {
+            return assert.equal(v, 1);
+        }, assert.ifError);
+    }, 
+    function FutureResolver_accept_Future() {
+        var F = Future.accept(1);
+        new Future(function (resolver) {
+            return resolver.accept(F);
+        }).done(function (v) {
+            return assert.equal(v, F);
+        }, assert.ifError);
+    }, 
+    function FutureResolver_resolve_value() {
+        new Future(function (resolver) {
+            return resolver.resolve(1);
+        }).done(function (v) {
+            return assert.equal(v, 1);
+        }, assert.ifError);
+    }, 
+    function FutureResolver_resolve_Future() {
+        var F = Future.accept(1);
+        new Future(function (resolver) {
+            return resolver.resolve(F);
+        }).done(function (v) {
+            return assert.equal(v, 1);
+        }, assert.ifError);
+    }, 
+    function FutureResolver_resolve_FutureFuture() {
+        var FF = Future.accept(Future.accept(1));
+        new Future(function (resolver) {
+            return resolver.resolve(FF);
+        }).done(function (v) {
+            return assert.equal(v, 1);
+        }, assert.ifError);
+    }, 
+    function FutureResolver_reject_value() {
+        new Future(function (resolver) {
+            return resolver.reject("error");
+        }).done(assert.isError, function (e) {
+            return assert.equal(e, "error");
+        });
+    }, 
+    function FutureResolver_reject_Future() {
+        var F = Future.accept("error");
+        new Future(function (resolver) {
+            return resolver.reject(F);
+        }).done(assert.isError, function (e) {
+            return assert.equal(e, F);
+        });
+    }, 
+    function Future_accept_value_then() {
+        Future.accept(1).then(function (v) {
+            return v;
+        }).done(function (v) {
+            return assert.equal(v, 1);
+        }, assert.isError);
+    }, 
+    function Future_accept_value_then_throw() {
+        Future.accept(1).then(function (v) {
+            throw "error";
+        }).done(assert.isError, function (e) {
+            return assert.equal(e, "error");
+        });
+    }, 
+    function Future_accept_Future_then() {
+        var F = Future.accept(1);
+        Future.accept(F).then(function (v) {
+            return v;
+        }).done(function (v) {
+            return assert.equal(v, 1);
+        }, assert.isError);
+    }, 
+    function Future_accept_FutureFuture_then() {
+        var F = Future.accept(Future.accept(1));
+        Future.accept(F).then(function (v) {
+            return v;
+        }).done(function (v) {
+            return assert.equal(v, 1);
+        }, assert.isError);
+    }, 
+    function Future_accept_Future_then_accept() {
+        var F = Future.accept(1);
+        Future.accept(F).then(function (v) {
+            return Future.accept(v);
+        }).done(function (v) {
+            return assert.equal(v, F);
+        }, assert.isError);
+    }, 
+    function Future_accept_Future_then_resolve() {
+        var F = Future.accept(1);
+        Future.accept(F).then(function (v) {
+            return Future.resolve(v);
+        }).done(function (v) {
+            return assert.equal(v, 1);
+        }, assert.isError);
+    }, 
+    function Future_accept_Future_then_reject() {
+        var F = Future.accept(1);
+        Future.accept(F).then(function (v) {
+            return Future.reject("error");
+        }).done(assert.isError, function (e) {
+            return assert.equal(e, "error");
+        });
+    }, 
+    function Future_resolve_value_then() {
+        Future.resolve(1).then(function (v) {
+            return v;
+        }).done(function (v) {
+            return assert.equal(v, 1);
+        }, assert.isError);
+    }, 
+    function Future_resolve_Future_then() {
+        var F = Future.accept(1);
+        Future.resolve(F).then(function (v) {
+            return v;
+        }).done(function (v) {
+            return assert.equal(v, 1);
+        }, assert.isError);
+    }, 
+    function Future_resolve_FutureFuture_then() {
+        var F = Future.accept(Future.accept(1));
+        Future.resolve(F).then(function (v) {
+            return v;
+        }).done(function (v) {
+            return assert.equal(v, 1);
+        }, assert.isError);
+    }, 
+    function Future_resolve_Future_then_accept() {
+        var F = Future.accept(1);
+        Future.resolve(F).then(function (v) {
+            return Future.accept(v);
+        }).done(function (v) {
+            return assert.equal(v, 1);
+        }, assert.isError);
+    }, 
+    function Future_resolve_Future_then_resolve() {
+        var F = Future.accept(1);
+        Future.resolve(F).then(function (v) {
+            return Future.resolve(v);
+        }).done(function (v) {
+            return assert.equal(v, 1);
+        }, assert.isError);
+    }, 
+    function Future_resolve_Future_then_reject() {
+        var F = Future.accept(1);
+        Future.resolve(F).then(function (v) {
+            return Future.reject("error");
+        }).done(assert.isError, function (e) {
+            return assert.equal(e, "error");
+        });
+    }, 
+    function Future_reject_value_then_resolve() {
+        Future.reject("error").then(null, function (e) {
+            return 1;
+        }).done(function (v) {
+            return assert.equal(v, 1);
+        }, assert.isError);
+    }, 
+    function any_accept1_reject1() {
         var F0 = Future.accept(1);
         var F1 = Future.reject("error");
         Future.any(F0, F1).done(function (v) {
-            return console.assert(v === 1, "expected: 1, actual: %s", v);
-        }, function (e) {
-            return console.assert(false, e);
-        });
+            return assert.equal(v, 1);
+        }, assert.ifError);
     }, 
-    function any_reject() {
+    function any_reject1_accept1() {
         var F0 = Future.reject("error");
         var F1 = Future.accept(1);
-        Future.any(F0, F1).done(function (v) {
-            return console.assert(false, "expected reject, actual: %s", v);
-        }, function (e) {
-            return console.assert(e === "error", "expected: 'error', actual: '%s'", e);
+        Future.any(F0, F1).done(assert.ifError, function (e) {
+            return assert.equal(e, "error");
         });
     }, 
-    function some_accept() {
+    function any_reject2() {
+        var F0 = Future.reject("error0");
+        var F1 = Future.reject("error1");
+        Future.any(F0, F1).done(assert.ifError, function (e) {
+            return assert.equal(e, "error0");
+        });
+    }, 
+    function any_accept2() {
+        var F0 = Future.accept(1);
+        var F1 = Future.accept(2);
+        Future.any(F0, F1).done(function (v) {
+            return assert.equal(v, 1);
+        }, assert.ifError);
+    }, 
+    function any_none() {
+        Future.any().done(function (v) {
+            return assert.ok(v === undefined);
+        }, assert.ifError);
+    }, 
+    function some_accept1_reject1() {
         var F0 = Future.accept(1);
         var F1 = Future.reject("error");
         Future.some(F0, F1).done(function (v) {
-            return console.assert(v === 1, "expected: 1, actual: %s", v);
-        }, function (e) {
-            return console.assert(false, e);
-        });
+            return assert.equal(v, 1);
+        }, assert.ifError);
     }, 
-    function some_reject() {
+    function some_reject1_accept1() {
         var F0 = Future.accept(1);
         var F1 = Future.reject("error");
         Future.some(F1, F0).done(function (v) {
-            return console.assert(v === 1, "expected: 1, actual: %s", v);
-        }, function (e) {
-            return console.assert(false, e);
+            return assert.equal(v, 1);
+        }, assert.ifError);
+    }, 
+    function some_reject2() {
+        var F0 = Future.reject("error0");
+        var F1 = Future.reject("error1");
+        Future.some(F1, F0).done(assert.ifError, function (e) {
+            return assert.ok(Array.isArray(e) && e[0] == "error0" && e[1] == "error1");
         });
     }, 
-    function every() {
+    function some_none() {
+        Future.some().done(function (v) {
+            return assert.ok(v === undefined);
+        }, assert.ifError);
+    }, 
+    function every_accept1_reject1() {
         var F0 = Future.accept(1);
         var F1 = Future.reject("error");
-        Future.every(F0, F1).done(function (v) {
-            return console.assert(false, "expected reject, actual: %s", v);
-        }, function (e) {
-            return console.assert(e === "error", "expected: 'error', actual: '%s'", e);
+        Future.every(F0, F1).done(assert.ifError, function (e) {
+            return assert.equal(e, "error");
         });
+    }, 
+    function every_accept2() {
+        var F0 = Future.accept(1);
+        var F1 = Future.accept(2);
+        Future.every(F0, F1).done(function (v) {
+            return assert.ok(Array.isArray(v) && v[0] == 1 && v[1] == 2);
+        }, assert.ifError);
+    }, 
+    function every_reject2() {
+        var F0 = Future.reject("error0");
+        var F1 = Future.reject("error1");
+        Future.every(F0, F1).done(assert.ifError, function (e) {
+            return assert.equal(e, "error0");
+        });
+    }, 
+    function every_none() {
+        Future.every().done(function (v) {
+            return assert.ok(v === undefined);
+        }, assert.ifError);
     }];
 var count = 0;
 var failed = 0;
