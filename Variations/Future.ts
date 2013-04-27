@@ -1,4 +1,5 @@
 declare function setImmediate(callback: Function, ...args: any[]): number;
+declare var process;
 
 /** DOM FutureResolver 
   * http://dom.spec.whatwg.org/#futures - 4.3
@@ -42,12 +43,8 @@ class FutureResolver {
         future._state = "accepted";
         future._result = value;
         this._resolved = true;
-        if (synchronous) {
-            (<any>Future)._process(future._resolveCallbacks, value);
-        }
-        else {
-            setImmediate(() => (<any>Future)._process(future._resolveCallbacks, value));
-        }
+        
+        (<any>Future)._dispatch(() => (<any>Future)._process(future._resolveCallbacks, value), synchronous);
     }
 
     /** resolve algorithm: http://dom.spec.whatwg.org/#futures - 4.2
@@ -88,12 +85,8 @@ class FutureResolver {
         future._state = "rejected";
         future._result = value;
         this._resolved = true;
-        if (synchronous) {
-            (<any>Future)._process(future._rejectCallbacks, value);
-        }
-        else {
-            setImmediate(() => (<any>Future)._process(future._rejectCallbacks, value));
-        }
+
+        (<any>Future)._dispatch(() => (<any>Future)._process(future._rejectCallbacks, value), synchronous);
     }
 }
 
@@ -313,12 +306,50 @@ class Future {
         this._rejectCallbacks.push(rejectCallback);
         
         if (this._state === "accepted") {
-            setImmediate(() => Future._process(this._resolveCallbacks, this._result));
+            Future._dispatch(() => Future._process(this._resolveCallbacks, this._result));
         }
         else if (this._state === "rejected") {
-            setImmediate(() => Future._process(this._rejectCallbacks, this._result));
+            Future._dispatch(() => Future._process(this._rejectCallbacks, this._result));
         }
     }
+    
+    private static _dispatch(block: () => void, synchronous: bool): void {
+        if (synchronous) {
+            block();
+        }
+        else {
+            if (typeof setImmediate === "function") {
+                setImmediate(block);
+            }
+            else if (typeof process !== "undefined" && Object(process) === process && typeof process.nextTick === "function") {
+                process.nextTick(block);
+            }
+            else {
+                if (Future._queue == null) {
+                    Future._queue = [];
+                }
+
+                Future._queue.push(block);
+                if (Future._handle == null) {
+                    Future._handle = setInterval(() => {
+                        var count = 2;
+                        while (Future._queue.length && --count) {
+                            var block = Future._queue.unshift();
+                            block();
+                        }
+                        
+                        if (!Future._queue.length) {
+                            clearInterval(Future._handle);
+                            Future._handle = null;
+                        }
+                    }, 0);
+                }
+            }
+        }
+    }
+    
+    private static _queue: { (): void; }[];
+    private static _handle: number;
     
     /** process algorithm: http://dom.spec.whatwg.org/#futures - 4.2
       */

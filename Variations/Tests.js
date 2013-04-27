@@ -21,13 +21,9 @@ var FutureResolver = (function () {
         future._state = "accepted";
         future._result = value;
         this._resolved = true;
-        if(synchronous) {
-            (Future)._process(future._resolveCallbacks, value);
-        } else {
-            setImmediate(function () {
-                return (Future)._process(future._resolveCallbacks, value);
-            });
-        }
+        (Future)._dispatch(function () {
+            return (Future)._process(future._resolveCallbacks, value);
+        }, synchronous);
     };
     FutureResolver.prototype._resolve = function (value, synchronous) {
         if (typeof synchronous === "undefined") { synchronous = false; }
@@ -64,13 +60,9 @@ var FutureResolver = (function () {
         future._state = "rejected";
         future._result = value;
         this._resolved = true;
-        if(synchronous) {
-            (Future)._process(future._rejectCallbacks, value);
-        } else {
-            setImmediate(function () {
-                return (Future)._process(future._rejectCallbacks, value);
-            });
-        }
+        (Future)._dispatch(function () {
+            return (Future)._process(future._rejectCallbacks, value);
+        }, synchronous);
     };
     return FutureResolver;
 })();
@@ -229,13 +221,42 @@ var Future = (function () {
         this._resolveCallbacks.push(resolveCallback);
         this._rejectCallbacks.push(rejectCallback);
         if(this._state === "accepted") {
-            setImmediate(function () {
+            Future._dispatch(function () {
                 return Future._process(_this._resolveCallbacks, _this._result);
             });
         } else if(this._state === "rejected") {
-            setImmediate(function () {
+            Future._dispatch(function () {
                 return Future._process(_this._rejectCallbacks, _this._result);
             });
+        }
+    };
+    Future._dispatch = function _dispatch(block, synchronous) {
+        if(synchronous) {
+            block();
+        } else {
+            if(typeof setImmediate === "function") {
+                setImmediate(block);
+            } else if(typeof process !== "undefined" && Object(process) === process && typeof process.nextTick === "function") {
+                process.nextTick(block);
+            } else {
+                if(Future._queue == null) {
+                    Future._queue = [];
+                }
+                Future._queue.push(block);
+                if(Future._handle == null) {
+                    Future._handle = setInterval(function () {
+                        var count = 2;
+                        while(Future._queue.length && --count) {
+                            var block = Future._queue.unshift();
+                            block();
+                        }
+                        if(!Future._queue.length) {
+                            clearInterval(Future._handle);
+                            Future._handle = null;
+                        }
+                    }, 0);
+                }
+            }
         }
     };
     Future._process = function _process(callbacks, result) {
