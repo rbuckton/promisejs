@@ -11,7 +11,7 @@ declare var process;
   * http://dom.spec.whatwg.org/#futureresolver
   */
 export class FutureResolver {
-    private _future: Future;
+    private _future: FutureFriend;
     private _resolved: bool = false;
     
     constructor() {
@@ -54,12 +54,11 @@ export class FutureResolver {
     private _accept (value: any, synchronous?: bool = false) {
         if (this._resolved) return;
         
-        var future = <any>this._future;
-        future._state = "accepted";
-        future._result = value;
+        this._future._state = "accepted";
+        this._future._result = value;
         this._resolved = true;
         
-        (<any>Future)._dispatch(() => (<any>Future)._process(future._resolveCallbacks, value), synchronous);
+        Process(this._future._resolveCallbacks, value, synchronous);
     }
 
     /** resolve algorithm: http://dom.spec.whatwg.org/#futures - 4.2
@@ -73,8 +72,8 @@ export class FutureResolver {
         
         // TODO: Assumes only Future, if using symbols this needs to be updated
         if (Future.isFuture(value)) {
-            var resolve = (<any>Future)._makeFutureCallback(this, "_accept");
-            var reject = (<any>Future)._makeFutureCallback(this, "_reject");
+            var resolve = MakeFutureCallback(this, this._accept);
+            var reject = MakeFutureCallback(this, this._reject);
             try {
                 // using Future#done to reduce overhead of allocating an unneeded future.
                 value.done(resolve, reject);
@@ -98,12 +97,11 @@ export class FutureResolver {
     private _reject (value: any, synchronous?: bool = false) {
         if (this._resolved) return;
         
-        var future = <any>this._future;
-        future._state = "rejected";
-        future._result = value;
+        this._future._state = "rejected";
+        this._future._result = value;
         this._resolved = true;
 
-        (<any>Future)._dispatch(() => (<any>Future)._process(future._rejectCallbacks, value), synchronous);
+        Process(this._future._rejectCallbacks, value, synchronous);
     }
 }
 
@@ -112,7 +110,7 @@ export class FutureResolver {
   * http://dom.spec.whatwg.org/#future
   */
 export class Future {
-    private _resolver: FutureResolver;
+    private _resolver: FutureResolverFriend;
     private _resolveCallbacks: { (value: any): void; }[] = [];
     private _rejectCallbacks: { (value: any): void; }[] = [];
     private _state: string = "pending";
@@ -138,7 +136,7 @@ export class Future {
             init.call(this, this._resolver);
         }
         catch (e) {
-            (<any>this._resolver)._reject(e);
+            this._resolver._reject(e);
         }
     }
     
@@ -179,9 +177,10 @@ export class Future {
       * http://dom.spec.whatwg.org/#dom-future-any (modified)
       */
     static any(...values: any[]): Future {
-        return new Future(resolver => {
-            var resolveCallback = Future._makeFutureCallback(resolver, "_accept");
-            var rejectCallback = Future._makeFutureCallback(resolver, "_reject");
+        return new Future((resolver: FutureResolverFriend) => {
+            var resolveCallback = MakeFutureCallback(resolver, resolver._accept);
+            var rejectCallback = MakeFutureCallback(resolver, resolver._reject);
+            
             if (values.length <= 0) {
                 resolver.accept(undefined);
             }
@@ -202,15 +201,15 @@ export class Future {
       * http://dom.spec.whatwg.org/#dom-future-every (modified)
       */
     static every(...values: any[]): Future {
-        return new Future(resolver => {
+        return new Future((resolver: FutureResolverFriend) => {
             var countdown = values.length;
             var results = new Array(countdown);
-            var rejectCallback = Future._makeFutureCallback(resolver, "_reject");
+            var rejectCallback = MakeFutureCallback(resolver, resolver._reject);
             values.forEach((value, index) => {
                 var resolveCallback = value => {
                     results[index] = value;
                     if (--countdown === 0) {
-                        (<any>resolver)._accept(results, true);
+                        resolver._accept(results, true);
                     }
                 };
                 Future.resolve(value)._append(resolveCallback, rejectCallback);
@@ -227,15 +226,15 @@ export class Future {
       * http://dom.spec.whatwg.org/#dom-future-some (modified)
       */
     static some(...values: any[]): Future {
-        return new Future(resolver => {
+        return new Future((resolver: FutureResolverFriend) => {
             var countdown = values.length;
             var results = new Array(countdown);
-            var resolveCallback = Future._makeFutureCallback(resolver, "_accept");
+            var resolveCallback = MakeFutureCallback(resolver, resolver._accept);
             values.forEach((value, index) => {
                 var rejectCallback = value => {
                     results[index] = value;
                     if (--countdown === 0) {
-                        (<any>resolver)._reject(results, true);
+                        resolver._reject(results, true);
                     }
                 };
                 Future.resolve(value)._append(resolveCallback, rejectCallback);
@@ -297,22 +296,22 @@ export class Future {
       * http://dom.spec.whatwg.org/#dom-future-then (modified)
       */
     then(resolve?: (value: any) => any = null, reject?: (value: any) => any = null): Future {
-        return new Future(resolver => {
+        return new Future((resolver: FutureResolverFriend) => {
             var resolveCallback: (value: any) => void;
             var rejectCallback: (value: any) => void;
             
             if (resolve != null) {
-                resolveCallback = Future._makeFutureWrapperCallback(resolver, resolve);
+                resolveCallback = MakeFutureWrapperCallback(resolver, resolve);
             }
             else {
-                resolveCallback = Future._makeFutureCallback(resolver, "_accept");
+                resolveCallback = MakeFutureCallback(resolver, resolver._accept);
             }
             
             if (reject != null) {
-                rejectCallback = Future._makeFutureWrapperCallback(resolver, reject);
+                rejectCallback = MakeFutureWrapperCallback(resolver, reject);
             }
             else {
-                rejectCallback = Future._makeFutureCallback(resolver, "_reject");
+                rejectCallback = MakeFutureCallback(resolver, resolver._reject);
             }
             
             this._append(resolveCallback, rejectCallback);
@@ -336,15 +335,15 @@ export class Future {
       * http://dom.spec.whatwg.org/#dom-future-catch
       */
     catch(reject?: (value: any) => any = null): Future {
-        return new Future(resolver => {
-            var resolveCallback = value => (<any>resolver)._resolve(value, true);;
+        return new Future((resolver: FutureResolverFriend) => {
+            var resolveCallback = MakeFutureCallback(resolver, resolver._resolve);
             var rejectCallback: (value: any) => void;
             
             if (reject != null) {
-                rejectCallback = Future._makeFutureWrapperCallback(resolver, reject);
+                rejectCallback = MakeFutureWrapperCallback(resolver, reject);
             }
             else {
-                rejectCallback = Future._makeFutureCallback(resolver, "_reject");
+                rejectCallback = MakeFutureCallback(resolver, resolver._reject);
             }
             
             this._append(resolveCallback, rejectCallback);
@@ -377,86 +376,116 @@ export class Future {
         this._rejectCallbacks.push(rejectCallback);
         
         if (this._state === "accepted") {
-            Future._dispatch(() => Future._process(this._resolveCallbacks, this._result));
+            Process(this._resolveCallbacks, this._result);
         }
         else if (this._state === "rejected") {
-            Future._dispatch(() => Future._process(this._rejectCallbacks, this._result));
+            Process(this._rejectCallbacks, this._result);
         }
     }
-    
-    /** Dispatches a callback to the local event-loop for processing in a later turn
-      */
-    private static _dispatch(block: () => void, synchronous?: bool = false): void {
-        if (synchronous) {
-            block();
-        }
-        else {
-            if (typeof setImmediate === "function") {
-                setImmediate(block);
-            }
-            else if (typeof process !== "undefined" && Object(process) === process && typeof process.nextTick === "function") {
-                process.nextTick(block);
-            }
-            else {
-                if (Future._queue == null) {
-                    Future._queue = [];
-                }
+}
 
-                Future._queue.push(block);
-                if (Future._handle == null) {
-                    Future._handle = setInterval(() => {
-                        var count = 2;
-                        while (Future._queue.length && --count) {
-                            var block = Future._queue.shift();
-                            block();
-                        }
-                        
-                        if (!Future._queue.length) {
-                            clearInterval(Future._handle);
-                            Future._handle = null;
-                        }
-                    }, 0);
-                }
-            }
-        }
+interface FutureResolverFriend {
+    _future: FutureFriend;
+    _resolved: bool;
+    _accept(value: any, synchronous?: bool): void;
+    _resolve(value: any, synchronous?: bool): void;
+    _reject(value: any, synchronous?: bool): void;
+    accept(value: any): void;
+    resolve(value: any): void;
+    reject(value: any): void;
+}
+
+interface FutureFriend {
+    _resolver: FutureResolverFriend;
+    _resolveCallbacks: { (value: any): void; }[];
+    _rejectCallbacks: { (value: any): void; }[];
+    _state: string;
+    _result: any;
+    _append(resolveCallback: (value: any) => void, rejectCallback: (value: any) => void): void;
+    
+    then(resolve?: (value: any) => any, reject?: (value: any) => any): Future;
+    catch(reject?: (value: any) => any): Future;
+    done(resolve?: (value: any) => any, reject?: (value: any) => any): void;
+}
+
+/** process algorithm: http://dom.spec.whatwg.org/#concept-future-process
+  */
+function Process(callbacks: { (value: any): any; }[], result: any, synchronous?: bool = false): void {
+    if (!synchronous) {
+        Dispatch(() => Process(callbacks, result, true));
     }
-    
-    /** Queue used to reduce overhead when processing in environments without setImmediate/process.nextTick
-      */
-    private static _queue: { (): void; }[];
-    
-    /** Handle for a queue processor timer
-      */
-    private static _handle: number;
-    
-    /** process algorithm: http://dom.spec.whatwg.org/#concept-future-process
-      */
-    private static _process(callbacks: { (value: any): any; }[], result: any): void {
+    else {
         while (callbacks.length) {
             var callback = callbacks.shift();
             callback(result);
         }
     }
+}
     
-    /** future callback algorithm: http://dom.spec.whatwg.org/#concept-future-callback
-      */
-    private static _makeFutureCallback(resolver: any, algorithm: string): (value: any) => void {
-        return value => { resolver[algorithm](value, true); };
+/** future callback algorithm: http://dom.spec.whatwg.org/#concept-future-callback
+  */
+function MakeFutureCallback(resolver: any, algorithm: (value: any, synchronous?: bool) => void): (value: any) => void {
+    return value => { algorithm.call(resolver, value, true); };
+}
+    
+/** future wrapper callback algorithm: http://dom.spec.whatwg.org/#concept-future-wrapper-callback
+  */
+function MakeFutureWrapperCallback(resolver: FutureResolverFriend, callback: (value: any) => any): (value: any) => void {        
+    return (argument: any) => {
+        var value;
+        try {
+            value = callback.call(resolver._future, argument);
+        }
+        catch (e) {
+            resolver._reject(e, true);
+            return;
+        }
+        
+        resolver._resolve(value, true);
     }
-    
-    /** future wrapper callback algorithm: http://dom.spec.whatwg.org/#concept-future-wrapper-callback
-      */
-    private static _makeFutureWrapperCallback(resolver: any, callback: (value: any) => any): (value: any) => void {        
-        return (argument: any) => {
-            var value;
-            try {
-                value = callback.call(resolver._future, argument);
+}
+
+/** Dispatches a callback to the local event-loop for processing in a later turn
+  */
+function Dispatch(block: () => void, synchronous?: bool = false): void {
+    if (synchronous) {
+        block();
+    }
+    else {
+        if (typeof setImmediate === "function") {
+            setImmediate(block);
+        }
+        else if (typeof process !== "undefined" && Object(process) === process && typeof process.nextTick === "function") {
+            process.nextTick(block);
+        }
+        else {
+            if (queue == null) {
+                queue = [];
             }
-            catch (e) {
-                resolver._reject(e, true);
-                return;
+
+            queue.push(block);
+            if (handle == null) {
+                handle = setInterval(() => {
+                    var count = 2;
+                    while (queue.length && --count) {
+                        var block = queue.shift();
+                        block();
+                    }
+                    
+                    if (!queue.length) {
+                        clearInterval(handle);
+                        handle = null;
+                    }
+                }, 0);
             }
-            resolver._resolve(value, true);
         }
     }
 }
+
+/** Queue used to reduce overhead when processing in environments without setImmediate/process.nextTick
+  */
+var queue: { (): void; }[];
+
+/** Handle for a queue processor timer
+  */
+var handle: number;
