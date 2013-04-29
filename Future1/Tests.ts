@@ -283,6 +283,44 @@ var tests = [
         Future.every().done(
             v => assert.ok(v === undefined),
             assert.ifError);
+    },
+    function FutureFutureFuture_then_then_done() {
+        var F = Future.accept(1);
+        var FF = Future.accept(F);
+        var FFF = Future.accept(FF);
+        FFF.then().then().done(
+            v => assert.equal(v, FF),
+            assert.ifError);
+    },
+    function FutureForThenable_accept() {
+        var T = { then: function() { assert.ok(false, "should not be called") } };
+        var F = Future.accept(T);
+        F.done(
+            v => assert.equal(v, T),
+            assert.ifError);
+    },
+    function FutureForThenable_resolve() {
+        var T = { then: function() { assert.ok(false, "should not be called") } };
+        var F = Future.resolve(T);
+        F.done(
+            v => assert.equal(v, T),
+            assert.ifError);
+    },
+    function FutureForAssimilatedThenable_accept() {
+        var T = { then: function(resolve, reject) { resolve(1); } }
+        var F = Future.from(T);
+        var FF = Future.accept(F);
+        FF.done(
+            v => assert.equal(v, F),
+            assert.ifError);
+    },
+    function FutureForAssimilatedThenable_resolve() {
+        var T = { then: function(resolve, reject) { resolve(1); } }
+        var F = Future.from(T);
+        var FF = Future.resolve(F);
+        FF.done(
+            v => assert.equal(v, 1),
+            assert.ifError);
     }
 ];
 
@@ -295,7 +333,9 @@ tests.forEach(test => {
     domain.on("error", e => { 
         failed++; 
         errors.push("Test failed: " + (<any>test).name + ". Message:", e.toString(), "");
-        process.nextTick(function() {});
+        process.nextTick(function() {
+          // fixes odd test issue where exit is sometimes called before the last test is written
+        });
     });
     domain.run(test);
 });

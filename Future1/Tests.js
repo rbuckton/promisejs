@@ -580,6 +580,60 @@ var tests = [
         Future.every().done(function (v) {
             return assert.ok(v === undefined);
         }, assert.ifError);
+    }, 
+    function FutureFutureFuture_then_then_done() {
+        var F = Future.accept(1);
+        var FF = Future.accept(F);
+        var FFF = Future.accept(FF);
+        FFF.then().then().done(function (v) {
+            return assert.equal(v, FF);
+        }, assert.ifError);
+    }, 
+    function FutureForThenable_accept() {
+        var T = {
+            then: function () {
+                assert.ok(false, "should not be called");
+            }
+        };
+        var F = Future.accept(T);
+        F.done(function (v) {
+            return assert.equal(v, T);
+        }, assert.ifError);
+    }, 
+    function FutureForThenable_resolve() {
+        var T = {
+            then: function () {
+                assert.ok(false, "should not be called");
+            }
+        };
+        var F = Future.resolve(T);
+        F.done(function (v) {
+            return assert.equal(v, T);
+        }, assert.ifError);
+    }, 
+    function FutureForAssimilatedThenable_accept() {
+        var T = {
+            then: function (resolve, reject) {
+                resolve(1);
+            }
+        };
+        var F = Future.from(T);
+        var FF = Future.accept(F);
+        FF.done(function (v) {
+            return assert.equal(v, F);
+        }, assert.ifError);
+    }, 
+    function FutureForAssimilatedThenable_resolve() {
+        var T = {
+            then: function (resolve, reject) {
+                resolve(1);
+            }
+        };
+        var F = Future.from(T);
+        var FF = Future.resolve(F);
+        FF.done(function (v) {
+            return assert.equal(v, 1);
+        }, assert.ifError);
     }];
 var errors = [];
 var count = 0;
