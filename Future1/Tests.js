@@ -36,7 +36,7 @@ var FutureResolver = (function () {
         if(this._resolved) {
             return;
         }
-        if(value instanceof Future) {
+        if(Future.isFuture(value)) {
             var resolve = (Future)._makeFutureCallback(this, "_accept");
             var reject = (Future)._makeFutureCallback(this, "_reject");
             try  {
@@ -158,7 +158,7 @@ var Future = (function () {
         });
     };
     Future.from = function from(value) {
-        if(value instanceof Future) {
+        if(Future.isFuture(value)) {
             return value;
         }
         if(Object(value) === value && typeof value.then === "function") {
@@ -167,6 +167,9 @@ var Future = (function () {
             });
         }
         return Future.resolve(value);
+    };
+    Future.isFuture = function isFuture(value) {
+        return value instanceof Future;
     };
     Future.prototype.then = function (resolve, reject) {
         if (typeof resolve === "undefined") { resolve = null; }

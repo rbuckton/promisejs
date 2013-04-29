@@ -72,7 +72,7 @@ class FutureResolver {
         if (this._resolved) return;
         
         // TODO: Assumes only Future, if using symbols this needs to be updated
-        if (value instanceof Future) {
+        if (Future.isFuture(value)) {
             var resolve = (<any>Future)._makeFutureCallback(this, "_accept");
             var reject = (<any>Future)._makeFutureCallback(this, "_reject");
             try {
@@ -253,7 +253,7 @@ class Future {
       * (not currently specified)
       */
     static from(value: any): Future {
-        if (value instanceof Future) {
+        if (Future.isFuture(value)) {
             return value;
         }
         
@@ -262,6 +262,18 @@ class Future {
         }
         
         return Future.resolve(value);
+    }
+    
+    /** Determines if a value is a Future
+      * @param value The value to test
+      * @returns True if the value is a Future instance; otherwise, false.
+      *
+      * (not currently specified)
+      */
+    static isFuture(value: any): bool {
+        
+        // TODO: This needs to be done by checking for a symbol or branding to support Futures from other realms.
+        return value instanceof Future;
     }
     
     /** Creates a new chained Future that is resolved by executing the continuations provided when this Future completes.
