@@ -10,7 +10,7 @@ declare var process;
 /** FutureResolver 
   * http://dom.spec.whatwg.org/#futureresolver
   */
-class FutureResolver {
+export class FutureResolver {
     private _future: Future;
     private _resolved: bool = false;
     
@@ -111,7 +111,7 @@ class FutureResolver {
   * 
   * http://dom.spec.whatwg.org/#future
   */
-class Future {
+export class Future {
     private _resolver: FutureResolver;
     private _resolveCallbacks: { (value: any): void; }[] = [];
     private _rejectCallbacks: { (value: any): void; }[] = [];

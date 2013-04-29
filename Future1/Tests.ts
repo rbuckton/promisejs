@@ -1,12 +1,7 @@
-/// <reference path="Future.ts" />
 declare var process, require;
-
-// load Future.js into the process (not a module, so no require)
-// eval(require("fs").readFileSync("Future.js"));
-
-var setImmediate = process.nextTick;
+import __futures__ = module('Future');
+var Future = __futures__.Future;
 var assert = require("assert");
-
 var tests = [
     function Future_accept_value() {
         Future.accept(1).done(

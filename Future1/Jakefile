@@ -4,16 +4,36 @@ file("Future.ts");
 file("Tests.ts");
 file("../Header.txt");
 
-tsc("Future.js", ["Future.ts", "../Header.txt"], ["Future.ts"], { header: "../Header.txt" });
-tsc("Tests.js", ["Tests.ts", "../Header.txt"], ["Tests.ts"], { header: "../Header.txt" });
+tsc("Future.js", ["Future.ts", "../Header.txt"], ["Future.ts"], { 
+    module: "umd", 
+    umd: {         
+        polyfill: "typeof Future === 'undefined' && typeof FutureResolver === 'undefined'",
+        exports: "global"
+    }
+});
+
+tsc("Tests.js", ["Tests.ts", "../Header.txt"], ["Tests.ts"], { 
+    module: "umd", 
+    umd: { 
+        imports: {
+            "./Future": "global"
+        }, 
+        exports: "named"
+    }
+});
 
 task("default", ["test"]);
+
 task("build", ["Future.js", "Tests.js"]);
+
 task("clean", [], function() {
     if (fs.existsSync("Future.js")) fs.unlinkSync("Future.js");
     if (fs.existsSync("Tests.js")) fs.unlinkSync("Tests.js");
+    if (fs.existsSync("obj")) jake.rmRf("obj");
 });
+
 task("rebuild", ["clean", "build"]);
+
 task("test", ["Future.js", "Tests.js", "Future.ts", "Tests.ts", "build"], function() {
     var cmd = "node Tests.js";
     console.log(cmd);
@@ -21,7 +41,9 @@ task("test", ["Future.js", "Tests.js", "Future.ts", "Tests.ts", "build"], functi
         complete();
     }, { printStdout: true, printStderr: true, breakOnError: false });    
 }, { async: true });
+
 task("world", ["clean", "build", "test"]);
+
 function copy(dest, source) {
     if (!dest) {
         dest = {};
@@ -42,28 +64,78 @@ function tsc(target, prereqs, sources, options) {
         if (options.comments) cmd += " --comments";
         if (options.declcomments) cmd += " --declcomments";
         if (options.target) cmd += " --target " + options.target;
-        if (options.module) cmd += " --module " + options.module;
+        if (/^amd$/i.test(options.module)) cmd += " --module amd";
         if (options.debug) cmd += " --sourcemap";
-        if (options.outDir) {
-            cmd += " --out " + options.outDir;
-        }
-        else {
-            if (!/^amd$/i.test(options.module)) {
-                cmd += " --out " + target;
-            }
-        }
+        
+        cmd += " --out obj";
         cmd += " " + sources.join(" ");
+
         console.log(cmd);
         jake.exec([cmd], function () {
         
-            if (options.header) {
-                var headerSrc = fs.readFileSync(options.header).toString();
-                fs.writeFileSync("temp.js", headerSrc.trim() + "\r\n");
+            if (/^umd$/i.test(options.module)) {
+            
+                var targetId = target.replace(/\.[a-z]+$/i, "");
+                var umd = copy({ }, options.umd);                
+                var targetSrc = fs.readFileSync("obj/" + target).toString();
+                var re = /^\s*var\s+([a-z0-9_$]+)\s*=\s*require\s*\(\s*((['"])[[a-z0-9_\.\\\/ ]+\3)\s*\)\s*/gi;
+                var imports = [];
+                var m;
+                while (m = re.exec(targetSrc)) {
+                    imports.push(m[2]);
+                }
                 
-                var targetSrc = fs.readFileSync(target).toString();
-                fs.appendFileSync("temp.js", targetSrc.trim());
+                var umdSrc = fs.readFileSync("../txt/umd.pre.js").toString();
+                var finalSrc = umdSrc.replace(/\${(\w+)}/gi, function (_, id) {
+                    if (id === "imports") {
+                        return imports.length ? ", " + imports.join(", ") : "";
+                    }
+                    else if (id === "content") {
+                        return targetSrc.split(/\r\n|\n/).join("\r\n    ").trim();
+                    }
+                    else if (id === "scriptRequire") {
+                        if (!imports.length) {
+                            return "null";
+                        }
+                        
+                        if (umd.imports) {
+                            var sb = [
+                                "function (name) {", 
+                                "    switch (name) {"
+                            ];
+                            for (var p in umd.imports) {
+                                if (umd.imports[p] === "global") {
+                                    sb.push("        case '" + p + "': return global;");
+                                }
+                                else {
+                                    sb.push("        case '" + p + "': return global['" + umd.imports[p] + "'];");
+                                }
+                            }
+                            sb.push("    }", "    return global[name];", "}");
+                            return sb.join("\r\n        ");
+                        }
+                        
+                        return "function(name) { return global[name]; }"
+                    }
+                    else if (id === "scriptExports") {
+                        switch (umd.exports) {
+                            case "global": return "global";
+                            default: return "global." + targetId + " = {}";
+                        }
+                    }
+                    else if (id === "polyfill") {
+                        if (umd.polyfill) {
+                            return "if (!(" + umd.polyfill + ")) return;";                            
+                        }
+                    }
+                    return "";
+                });
                 
-                fs.renameSync("temp.js", target);
+                fs.writeFileSync(target, finalSrc);
+                
+            }
+            else {
+                fs.renameSync("obj/" + target, target);
             }
         
             complete();
