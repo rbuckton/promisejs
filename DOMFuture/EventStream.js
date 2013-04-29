@@ -1,14 +1,9 @@
-/*! 
-* This source is subject to the Microsoft Public License.
-* See http://www.microsoft.com/opensource/licenses.mspx#Ms-PL.
-* All other rights reserved.
-* ----------------------------------------------------------------------
-* Version: 1.0.0.0
-* Author: Ron Buckton (rbuckton@chronicles.org)
-* ----------------------------------------------------------------------
-*/
-// @requires Symbol.js
-// @requires DOMFuture.js
+/*!
+ *
+ * Copyright 2013 Ron A. Buckton under the terms of the MIT license found at:
+ * https://github.com/rbuckton/promisejs/raw/master/LICENSE
+ * 
+ */
 (function (definition) {
     if (typeof EventStream === "undefined") {
         definition(window, Symbol, Future);

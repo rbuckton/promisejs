@@ -1,11 +1,19 @@
+var fs = require("fs");
+
 file("Future.ts");
 file("Tests.ts");
+file("../Header.txt");
 
-tsc("Future.js", ["Future.ts"], ["Future.ts"]);
-tsc("Tests.js", ["Tests.ts"], ["Tests.ts"]);
+tsc("Future.js", ["Future.ts", "../Header.txt"], ["Future.ts"], { header: "../Header.txt" });
+tsc("Tests.js", ["Tests.ts", "../Header.txt"], ["Tests.ts"], { header: "../Header.txt" });
 
 task("default", ["test"]);
 task("build", ["Future.js", "Tests.js"]);
+task("clean", [], function() {
+    if (fs.existsSync("Future.js")) fs.unlinkSync("Future.js");
+    if (fs.existsSync("Tests.js")) fs.unlinkSync("Tests.js");
+});
+task("rebuild", ["clean", "build"]);
 task("test", ["Future.js", "Tests.js", "Future.ts", "Tests.ts", "build"], function() {
     var cmd = "node Tests.js";
     console.log(cmd);
@@ -13,7 +21,7 @@ task("test", ["Future.js", "Tests.js", "Future.ts", "Tests.ts", "build"], functi
         complete();
     }, { printStdout: true, printStderr: true, breakOnError: false });    
 }, { async: true });
-
+task("world", ["clean", "build", "test"]);
 function copy(dest, source) {
     if (!dest) {
         dest = {};
@@ -27,6 +35,7 @@ function copy(dest, source) {
 function tsc(target, prereqs, sources, options) {
     options = copy({ target: "ES5" }, options);
     file(target, prereqs, function () {
+        var out = target;
         var cmd = "tsc";
         if (options.declaration) cmd += " --declaration";
         if (options.cflowu) cmd += " --cflowu";
@@ -46,6 +55,17 @@ function tsc(target, prereqs, sources, options) {
         cmd += " " + sources.join(" ");
         console.log(cmd);
         jake.exec([cmd], function () {
+        
+            if (options.header) {
+                var headerSrc = fs.readFileSync(options.header).toString();
+                fs.writeFileSync("temp.js", headerSrc.trim() + "\r\n");
+                
+                var targetSrc = fs.readFileSync(target).toString();
+                fs.appendFileSync("temp.js", targetSrc.trim());
+                
+                fs.renameSync("temp.js", target);
+            }
+        
             complete();
         }, { async: true, printStdout: true, printStderr: true, breakOnError: false });
     }, { async: true });

@@ -1,3 +1,9 @@
+/*!
+ *
+ * Copyright 2013 Ron A. Buckton under the terms of the MIT license found at:
+ * https://github.com/rbuckton/promisejs/raw/master/LICENSE
+ * 
+ */
 var FutureResolver = (function () {
     function FutureResolver() {
         this._resolved = false;
@@ -231,6 +237,7 @@ var Future = (function () {
         }
     };
     Future._dispatch = function _dispatch(block, synchronous) {
+        if (typeof synchronous === "undefined") { synchronous = false; }
         if(synchronous) {
             block();
         } else {
@@ -247,7 +254,7 @@ var Future = (function () {
                     Future._handle = setInterval(function () {
                         var count = 2;
                         while(Future._queue.length && --count) {
-                            var block = Future._queue.unshift();
+                            var block = Future._queue.shift();
                             block();
                         }
                         if(!Future._queue.length) {

@@ -1,3 +1,10 @@
+/*!
+ *
+ * Copyright 2013 Ron A. Buckton under the terms of the MIT license found at:
+ * https://github.com/rbuckton/promisejs/raw/master/LICENSE
+ * 
+ */
+
 declare function setImmediate(callback: Function, ...args: any[]): number;
 declare var process;
 
@@ -313,7 +320,7 @@ class Future {
         }
     }
     
-    private static _dispatch(block: () => void, synchronous: bool): void {
+    private static _dispatch(block: () => void, synchronous?: bool = false): void {
         if (synchronous) {
             block();
         }
@@ -334,7 +341,7 @@ class Future {
                     Future._handle = setInterval(() => {
                         var count = 2;
                         while (Future._queue.length && --count) {
-                            var block = Future._queue.unshift();
+                            var block = Future._queue.shift();
                             block();
                         }
                         
@@ -353,7 +360,7 @@ class Future {
     
     /** process algorithm: http://dom.spec.whatwg.org/#futures - 4.2
       */
-    private static _process(callbacks: { (value: any): void; }[], result: any): void {
+    private static _process(callbacks: { (value: any): any; }[], result: any): void {
         while (callbacks.length) {
             var callback = callbacks.shift();
             callback(result);
