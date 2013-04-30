@@ -5,7 +5,6 @@
  * 
  */
 (function (definition, global) {
-    ${polyfill}
     if (typeof define === "function" && define.amd) {
         define(["require", "exports"${imports}], definition);
     }
@@ -13,6 +12,7 @@
         definition(require, module["exports"] || exports);
     }
     else {
+        ${polyfill}
         definition(${scriptRequire}, ${scriptExports});
     }
 })

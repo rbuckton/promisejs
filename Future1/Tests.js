@@ -5,7 +5,6 @@
  * 
  */
 (function (definition, global) {
-    
     if (typeof define === "function" && define.amd) {
         define(["require", "exports", './Future'], definition);
     }
@@ -13,6 +12,7 @@
         definition(require, module["exports"] || exports);
     }
     else {
+        
         definition(function (name) {
             switch (name) {
                 case './Future': return global;

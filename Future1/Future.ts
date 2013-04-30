@@ -252,7 +252,6 @@ export class Future {
       * (not currently specified)
       */
     static from(value: any): Future {
-        
         if (Future.isFuture(value)) {
             return value;
         }
@@ -286,9 +285,7 @@ export class Future {
       * (not currently specified)
       */
     static isFuture(value: any): bool {
-        
-        // TODO: This needs to be done by checking for a symbol or branding to support Futures from other realms.
-        return value instanceof Future;
+        return Object(value) === value && "@Symbol@Brand" in value && value["@Symbol@Brand"] === "Future";
     }
     
     /** Creates a new chained Future that is resolved by executing the continuations provided when this Future completes.
@@ -400,6 +397,9 @@ export class Future {
     }
 }
 
+// define a "brand" that marks this as a Future
+Object.defineProperty(Future.prototype, "@Symbol@Brand", { value: "Future" });
+
 interface FutureResolverFriend {
     _future: FutureFriend;
     _resolved: bool;
@@ -461,6 +461,14 @@ function MakeFutureWrapperCallback(resolver: FutureResolverFriend, callback: (va
     }
 }
 
+/** Queue used to reduce overhead when processing in environments without setImmediate/process.nextTick
+  */
+var queue: { (): void; }[];
+
+/** Handle for a queue processor timer
+  */
+var handle: number;
+
 /** Dispatches a callback to the local event-loop for processing in a later turn
   */
 function Dispatch(block: () => void, synchronous?: bool = false): void {
@@ -497,11 +505,3 @@ function Dispatch(block: () => void, synchronous?: bool = false): void {
         }
     }
 }
-
-/** Queue used to reduce overhead when processing in environments without setImmediate/process.nextTick
-  */
-var queue: { (): void; }[];
-
-/** Handle for a queue processor timer
-  */
-var handle: number;

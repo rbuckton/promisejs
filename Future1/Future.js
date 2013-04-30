@@ -5,7 +5,6 @@
  * 
  */
 (function (definition, global) {
-    if (!(typeof Future === 'undefined' && typeof FutureResolver === 'undefined')) return;
     if (typeof define === "function" && define.amd) {
         define(["require", "exports"], definition);
     }
@@ -13,6 +12,7 @@
         definition(require, module["exports"] || exports);
     }
     else {
+        if (!(typeof Future === 'undefined' && typeof FutureResolver === 'undefined')) return;
         definition(null, global);
     }
 })
@@ -187,7 +187,7 @@
             });
         };
         Future.isFuture = function isFuture(value) {
-            return value instanceof Future;
+            return Object(value) === value && "@Symbol@Brand" in value && value["@Symbol@Brand"] === "Future";
         };
         Future.prototype.then = function (resolve, reject) {
             if (typeof resolve === "undefined") { resolve = null; }
@@ -240,6 +240,9 @@
         return Future;
     })();
     exports.Future = Future;
+    Object.defineProperty(Future.prototype, "@Symbol@Brand", {
+        value: "Future"
+    });
     function Process(callbacks, result, synchronous) {
         if (typeof synchronous === "undefined") { synchronous = false; }
         if(!synchronous) {
@@ -270,6 +273,8 @@
             resolver._resolve(value, true);
         };
     }
+    var queue;
+    var handle;
     function Dispatch(block, synchronous) {
         if (typeof synchronous === "undefined") { synchronous = false; }
         if(synchronous) {
@@ -300,6 +305,4 @@
             }
         }
     }
-    var queue;
-    var handle;
 }, this);
