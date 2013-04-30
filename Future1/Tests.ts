@@ -316,6 +316,24 @@ var tests = [
         FF.done(
             v => assert.equal(v, 1),
             assert.ifError);
+    },
+    function FutureForAssimilatedNestedThenable_accept() {
+        var T1 = { then: function(resolve, reject) { resolve(1); } }
+        var T2 = { then: function(resolve, reject) { resolve(T1); } }
+        var F = Future.from(T2);
+        var FF = Future.accept(F);
+        FF.done(
+            v => assert.equal(v, F),
+            assert.ifError);
+    },
+    function FutureForAssimilatedNestedThenable_resolve() {
+        var T1 = { then: function(resolve, reject) { resolve(1); } }
+        var T2 = { then: function(resolve, reject) { resolve(T1); } }
+        var F = Future.from(T2);
+        var FF = Future.resolve(F);
+        FF.done(
+            v => assert.equal(v, 1),
+            assert.ifError);
     }
 ];
 

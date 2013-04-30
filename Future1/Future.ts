@@ -252,15 +252,31 @@ export class Future {
       * (not currently specified)
       */
     static from(value: any): Future {
+        
         if (Future.isFuture(value)) {
             return value;
         }
-        
-        if (Object(value) === value && typeof value.then === "function") {
-            return new Future(function(resolver) { value.then(resolver.accept, resolver.reject); });
-        }
-        
-        return Future.resolve(value);
+
+        return new Future(function (resolver) { 
+            var resolve = v => {
+                try {
+                    if (Future.isFuture(v)) {
+                        v.done(resolver.accept, resolver.reject);
+                    }            
+                    else if (Object(v) === v && typeof v.then === "function") {
+                        v.then(resolve, resolver.reject);
+                    }
+                    else {
+                        resolver.accept(v);
+                    }
+                }
+                catch (e) {
+                    resolver.reject(e);
+                }
+            };
+            
+            resolve(value);
+        });
     }
     
     /** Determines if a value is a Future
