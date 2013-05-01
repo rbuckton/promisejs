@@ -11,7 +11,7 @@ declare var process;
 /** DOM FutureResolver 
   * http://dom.spec.whatwg.org/#futures - 4.3
   */
-class FutureResolver {
+export class FutureResolver {
     private _future: Future;
     private _resolved: bool = false;
     
@@ -100,7 +100,7 @@ class FutureResolver {
 /** DOM Future
   * http://dom.spec.whatwg.org/#futures - 4.3
   */
-class Future {
+export class Future {
     private _resolver: FutureResolver;
     private _resolveCallbacks: { (value: any): void; }[] = [];
     private _rejectCallbacks: { (value: any): void; }[] = [];
@@ -382,4 +382,10 @@ class Future {
             resolver._resolve(value, true);
         }
     }
+}
+
+// polyfill for Futures
+if (typeof window !== "undefined" && typeof (<any>window).Future === "undefined") {
+    (<any>window).Future = Future;
+    (<any>window).FutureResolver = FutureResolver;
 }

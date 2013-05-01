@@ -12,8 +12,14 @@
         definition(require, module["exports"] || exports);
     }
     else {
-        if (!(typeof Future === 'undefined' && typeof FutureResolver === 'undefined')) return;
-        definition(null, global);
+        definition(
+            function (name) { 
+                name = String(name)
+                    .replace(/^\s+|\s+$/g, "")
+                    .replace(/\\+|\/+/g, "/")
+                    .replace(/^\.\/|\/\.(\/)/g, "$1");
+                return global[name]; 
+            }, global["Future0/futures"] = { });
     }
 })
 (function (require, exports) {
@@ -36,21 +42,33 @@
             if(this._resolved) {
                 return;
             }
-            this._future._state = "accepted";
-            this._future._result = value;
+            var future = this._future;
+            future._state = "accepted";
+            future._result = value;
             this._resolved = true;
-            Process(this._future._resolveCallbacks, value, synchronous);
+            (Future)._dispatch(function () {
+                return (Future)._process(future._resolveCallbacks, value);
+            }, synchronous);
         };
         FutureResolver.prototype._resolve = function (value, synchronous) {
             if (typeof synchronous === "undefined") { synchronous = false; }
+            var _this = this;
             if(this._resolved) {
                 return;
             }
-            if(Future.isFuture(value)) {
-                var resolve = MakeFutureCallback(this, this._accept);
-                var reject = MakeFutureCallback(this, this._reject);
+            var then = null;
+            if(Object(value) === value) {
+                then = value.then;
+            }
+            if(typeof then === "function") {
+                var resolve = function (value) {
+                    _this._resolve(value, true);
+                };
+                var reject = function (value) {
+                    _this._reject(value, true);
+                };
                 try  {
-                    value.done(resolve, reject);
+                    then.call(value, resolve, reject);
                 } catch (e) {
                     this._reject(e, synchronous);
                 }
@@ -63,10 +81,13 @@
             if(this._resolved) {
                 return;
             }
-            this._future._state = "rejected";
-            this._future._result = value;
+            var future = this._future;
+            future._state = "rejected";
+            future._result = value;
             this._resolved = true;
-            Process(this._future._rejectCallbacks, value, synchronous);
+            (Future)._dispatch(function () {
+                return (Future)._process(future._rejectCallbacks, value);
+            }, synchronous);
         };
         return FutureResolver;
     })();
@@ -90,7 +111,7 @@
             try  {
                 init.call(this, this._resolver);
             } catch (e) {
-                this._resolver._reject(e);
+                (this._resolver)._reject(e);
             }
         }
         Future.accept = function accept(value) {
@@ -114,8 +135,12 @@
                 values[_i] = arguments[_i + 0];
             }
             return new Future(function (resolver) {
-                var resolveCallback = MakeFutureCallback(resolver, resolver._accept);
-                var rejectCallback = MakeFutureCallback(resolver, resolver._reject);
+                var resolveCallback = function (value) {
+                    resolver.resolve(value);
+                };
+                var rejectCallback = function (value) {
+                    resolver.reject(value);
+                };
                 if(values.length <= 0) {
                     resolver.accept(undefined);
                 } else {
@@ -133,12 +158,14 @@
             return new Future(function (resolver) {
                 var countdown = values.length;
                 var results = new Array(countdown);
-                var rejectCallback = MakeFutureCallback(resolver, resolver._reject);
+                var rejectCallback = function (value) {
+                    resolver.reject(value);
+                };
                 values.forEach(function (value, index) {
                     var resolveCallback = function (value) {
                         results[index] = value;
                         if(--countdown === 0) {
-                            resolver._accept(results, true);
+                            (resolver)._resolve(results, true);
                         }
                     };
                     Future.resolve(value)._append(resolveCallback, rejectCallback);
@@ -153,41 +180,19 @@
             return new Future(function (resolver) {
                 var countdown = values.length;
                 var results = new Array(countdown);
-                var resolveCallback = MakeFutureCallback(resolver, resolver._accept);
+                var resolveCallback = function (value) {
+                    resolver.resolve(value);
+                };
                 values.forEach(function (value, index) {
                     var rejectCallback = function (value) {
                         results[index] = value;
                         if(--countdown === 0) {
-                            resolver._reject(results, true);
+                            (resolver)._reject(results, true);
                         }
                     };
                     Future.resolve(value)._append(resolveCallback, rejectCallback);
                 });
             });
-        };
-        Future.from = function from(value) {
-            if(Future.isFuture(value)) {
-                return value;
-            }
-            return new Future(function (resolver) {
-                var resolve = function (v) {
-                    try  {
-                        if(Future.isFuture(v)) {
-                            v.done(resolver.accept, resolver.reject);
-                        } else if(Object(v) === v && typeof v.then === "function") {
-                            v.then(resolve, resolver.reject);
-                        } else {
-                            resolver.accept(v);
-                        }
-                    } catch (e) {
-                        resolver.reject(e);
-                    }
-                };
-                resolve(value);
-            });
-        };
-        Future.isFuture = function isFuture(value) {
-            return Object(value) === value && "@Symbol@Brand" in value && value["@Symbol@Brand"] === "Future";
         };
         Future.prototype.then = function (resolve, reject) {
             if (typeof resolve === "undefined") { resolve = null; }
@@ -197,14 +202,18 @@
                 var resolveCallback;
                 var rejectCallback;
                 if(resolve != null) {
-                    resolveCallback = MakeFutureWrapperCallback(resolver, resolve);
+                    resolveCallback = Future._makeWrapperCallback(resolver, resolve);
                 } else {
-                    resolveCallback = MakeFutureCallback(resolver, resolver._accept);
+                    resolveCallback = function (value) {
+                        return (resolver)._resolve(value, true);
+                    };
                 }
                 if(reject != null) {
-                    rejectCallback = MakeFutureWrapperCallback(resolver, reject);
+                    rejectCallback = Future._makeWrapperCallback(resolver, reject);
                 } else {
-                    rejectCallback = MakeFutureCallback(resolver, resolver._reject);
+                    rejectCallback = function (value) {
+                        return (resolver)._reject(value, true);
+                    };
                 }
                 _this._append(resolveCallback, rejectCallback);
             });
@@ -213,12 +222,17 @@
             if (typeof reject === "undefined") { reject = null; }
             var _this = this;
             return new Future(function (resolver) {
-                var resolveCallback = MakeFutureCallback(resolver, resolver._resolve);
+                var resolveCallback = function (value) {
+                    return (resolver)._resolve(value, true);
+                };
+                ;
                 var rejectCallback;
                 if(reject != null) {
-                    rejectCallback = MakeFutureWrapperCallback(resolver, reject);
+                    rejectCallback = Future._makeWrapperCallback(resolver, reject);
                 } else {
-                    rejectCallback = MakeFutureCallback(resolver, resolver._reject);
+                    rejectCallback = function (value) {
+                        return (resolver)._reject(value, true);
+                    };
                 }
                 _this._append(resolveCallback, rejectCallback);
             });
@@ -229,80 +243,72 @@
             this._append(resolve, reject);
         };
         Future.prototype._append = function (resolveCallback, rejectCallback) {
+            var _this = this;
             this._resolveCallbacks.push(resolveCallback);
             this._rejectCallbacks.push(rejectCallback);
             if(this._state === "accepted") {
-                Process(this._resolveCallbacks, this._result);
+                Future._dispatch(function () {
+                    return Future._process(_this._resolveCallbacks, _this._result);
+                });
             } else if(this._state === "rejected") {
-                Process(this._rejectCallbacks, this._result);
+                Future._dispatch(function () {
+                    return Future._process(_this._rejectCallbacks, _this._result);
+                });
             }
         };
-        return Future;
-    })();
-    exports.Future = Future;
-    Object.defineProperty(Future.prototype, "@Symbol@Brand", {
-        value: "Future"
-    });
-    function Process(callbacks, result, synchronous) {
-        if (typeof synchronous === "undefined") { synchronous = false; }
-        if(!synchronous) {
-            Dispatch(function () {
-                return Process(callbacks, result, true);
-            });
-        } else {
+        Future._dispatch = function _dispatch(block, synchronous) {
+            if (typeof synchronous === "undefined") { synchronous = false; }
+            if(synchronous) {
+                block();
+            } else {
+                if(typeof setImmediate === "function") {
+                    setImmediate(block);
+                } else if(typeof process !== "undefined" && Object(process) === process && typeof process.nextTick === "function") {
+                    process.nextTick(block);
+                } else {
+                    if(Future._queue == null) {
+                        Future._queue = [];
+                    }
+                    Future._queue.push(block);
+                    if(Future._handle == null) {
+                        Future._handle = setInterval(function () {
+                            var count = 2;
+                            while(Future._queue.length && --count) {
+                                var block = Future._queue.shift();
+                                block();
+                            }
+                            if(!Future._queue.length) {
+                                clearInterval(Future._handle);
+                                Future._handle = null;
+                            }
+                        }, 0);
+                    }
+                }
+            }
+        };
+        Future._process = function _process(callbacks, result) {
             while(callbacks.length) {
                 var callback = callbacks.shift();
                 callback(result);
             }
-        }
-    }
-    function MakeFutureCallback(resolver, algorithm) {
-        return function (value) {
-            algorithm.call(resolver, value, true);
         };
-    }
-    function MakeFutureWrapperCallback(resolver, callback) {
-        return function (argument) {
-            var value;
-            try  {
-                value = callback.call(resolver._future, argument);
-            } catch (e) {
-                resolver._reject(e, true);
-                return;
-            }
-            resolver._resolve(value, true);
+        Future._makeWrapperCallback = function _makeWrapperCallback(resolver, callback) {
+            return function (argument) {
+                var value;
+                try  {
+                    value = callback.call(resolver._future, argument);
+                } catch (e) {
+                    resolver._reject(e, true);
+                    return;
+                }
+                resolver._resolve(value, true);
+            };
         };
-    }
-    var queue;
-    var handle;
-    function Dispatch(block, synchronous) {
-        if (typeof synchronous === "undefined") { synchronous = false; }
-        if(synchronous) {
-            block();
-        } else {
-            if(typeof setImmediate === "function") {
-                setImmediate(block);
-            } else if(typeof process !== "undefined" && Object(process) === process && typeof process.nextTick === "function") {
-                process.nextTick(block);
-            } else {
-                if(queue == null) {
-                    queue = [];
-                }
-                queue.push(block);
-                if(handle == null) {
-                    handle = setInterval(function () {
-                        var count = 2;
-                        while(queue.length && --count) {
-                            var block = queue.shift();
-                            block();
-                        }
-                        if(!queue.length) {
-                            clearInterval(handle);
-                            handle = null;
-                        }
-                    }, 0);
-                }
-            }
-        }
+        return Future;
+    })();
+    exports.Future = Future;
+    if(typeof window !== "undefined" && typeof (window).Future === "undefined") {
+        (window).Future = Future;
+        (window).FutureResolver = FutureResolver;
     }
 }, this);

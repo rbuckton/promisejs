@@ -12,8 +12,14 @@
         definition(require, module["exports"] || exports);
     }
     else {
-        ${polyfill}
-        definition(${scriptRequire}, ${scriptExports});
+        definition(
+            function (name) { 
+                name = String(name)
+                    .replace(/^\s+|\s+$/g, "")
+                    .replace(/\\+|\/+/g, "/")
+                    .replace(/^\.\/|\/\.(\/)/g, "$1");
+                return global[name]; 
+            }, global["${id}"] = { });
     }
 })
 (function (require, exports) {

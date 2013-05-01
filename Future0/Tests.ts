@@ -1,12 +1,9 @@
-/// <reference path="Future.ts" />
-declare var process, require;
+/// <reference path="..\lib\node.d.ts" />
+import futures = module("futures");
+import assert = module("assert");
+import domain = module("domain");
 
-// load Future.js into the process (not a module, so no require)
-eval(require("fs").readFileSync("Future.js"));
-
-var setImmediate = process.nextTick;
-var assert = require("assert");
-
+var Future = futures.Future;
 var tests = [
     function Future_accept_value() {
         Future.accept(1).done(
@@ -77,94 +74,94 @@ var tests = [
     },
     function FutureResolver_reject_value() {
         new Future(resolver => resolver.reject("error")).done(
-            assert.isError,
+            assert.ifError,
             e => assert.equal(e, "error"))
     },
     function FutureResolver_reject_Future() {
         var F = Future.accept("error");
         new Future(resolver => resolver.reject(F)).done(
-            assert.isError,
+            assert.ifError,
             e => assert.equal(e, F))
     },
     function Future_accept_value_then() {
         Future.accept(1).then(v => v).done(
             v => assert.equal(v, 1),
-            assert.isError);
+            assert.ifError);
     },
     function Future_accept_value_then_throw() {
         Future.accept(1).then(v => { throw "error" }).done(
-            assert.isError,
+            assert.ifError,
             e => assert.equal(e, "error"));
     },
     function Future_accept_Future_then() {
         var F = Future.accept(1);
         Future.accept(F).then(v => v).done(
             v => assert.equal(v, 1),
-            assert.isError);
+            assert.ifError);
     },
     function Future_accept_FutureFuture_then() {
         var F = Future.accept(Future.accept(1));
         Future.accept(F).then(v => v).done(
             v => assert.equal(v, 1),
-            assert.isError);
+            assert.ifError);
     },
     function Future_accept_Future_then_accept() {
         var F = Future.accept(1);
         Future.accept(F).then(v => Future.accept(v)).done(
             v => assert.equal(v, F),
-            assert.isError);
+            assert.ifError);
     },
     function Future_accept_Future_then_resolve() {
         var F = Future.accept(1);
         Future.accept(F).then(v => Future.resolve(v)).done(
             v => assert.equal(v, 1),
-            assert.isError);
+            assert.ifError);
     },
     function Future_accept_Future_then_reject() {
         var F = Future.accept(1);
         Future.accept(F).then(v => Future.reject("error")).done(
-            assert.isError,
+            assert.ifError,
             e => assert.equal(e, "error"));
     },
     function Future_resolve_value_then() {
         Future.resolve(1).then(v => v).done(
             v => assert.equal(v, 1),
-            assert.isError);
+            assert.ifError);
     },
     function Future_resolve_Future_then() {
         var F = Future.accept(1);
         Future.resolve(F).then(v => v).done(
             v => assert.equal(v, 1),
-            assert.isError);
+            assert.ifError);
     },
     function Future_resolve_FutureFuture_then() {
         var F = Future.accept(Future.accept(1));
         Future.resolve(F).then(v => v).done(
             v => assert.equal(v, 1),
-            assert.isError);
+            assert.ifError);
     },
     function Future_resolve_Future_then_accept() {
         var F = Future.accept(1);
         Future.resolve(F).then(v => Future.accept(v)).done(
             v => assert.equal(v, 1),
-            assert.isError);
+            assert.ifError);
     },
     function Future_resolve_Future_then_resolve() {
         var F = Future.accept(1);
         Future.resolve(F).then(v => Future.resolve(v)).done(
             v => assert.equal(v, 1),
-            assert.isError);
+            assert.ifError);
     },
     function Future_resolve_Future_then_reject() {
         var F = Future.accept(1);
         Future.resolve(F).then(v => Future.reject("error")).done(
-            assert.isError,
+            assert.ifError,
             e => assert.equal(e, "error"));
     },
     function Future_reject_value_then_resolve() {
         Future.reject("error").then(null, e => 1).done(
             v => assert.equal(v, 1),
-            assert.isError);
+            assert.ifError);
     },
     function any_accept1_reject1() {        
         var F0 = Future.accept(1);
@@ -273,15 +270,22 @@ var tests = [
     }
 ];
 
+var errors = [];
 var count = 0;
 var failed = 0;
 tests.forEach(test => {
     count++;
-    var domain = require("domain").create();
-    domain.on("error", e => { failed++; console.error("Test failed: %s. Message: %s", (<any>test).name, e) });
-    domain.run(test);
+    var d = domain.create();
+    d.on("error", e => { 
+        failed++; 
+        errors.push("Test failed: " + (<any>test).name + ". Message:", e.toString(), "");
+        process.nextTick(function() {
+          // fixes odd test issue where exit is sometimes called before the last test is written
+        });
+    });
+    d.run(test);
 });
 
 process.on("exit", function() {
-    console.log("done. succeeded: %s, failed: %s", count - failed, failed);
+    console.log("\r\n%sdone. succeeded: %s, failed: %s\r\n", errors.concat("").join("\r\n"), count - failed, failed);
 });
