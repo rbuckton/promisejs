@@ -1,4 +1,18 @@
-interface EventEmitter {
+declare module "events" {
+    export class EventEmitter {
+        addListener(event: string, listener: (value: any) => void): void;
+        on(event: string, listener: (value: any) => void): void;
+        once(event: string, listener: (value: any) => void): void;
+        removeListener(event: string, listener: (value: any) => void): void;
+        removeAllListeners(event?: string): void;
+        setMaxListeners(n: number): void;
+        listeners(event: string): { (value: any): void; }[];
+        emit(event: string, ...args: any[]): void;
+    }
+}
+
+declare class Process {
+    nextTick(callback: () => void): void;
     addListener(event: string, listener: (value: any) => void): void;
     on(event: string, listener: (value: any) => void): void;
     once(event: string, listener: (value: any) => void): void;
@@ -9,15 +23,11 @@ interface EventEmitter {
     emit(event: string, ...args: any[]): void;
 }
 
-interface Process extends EventEmitter {
-    nextTick(callback: () => void): void;
-}
+declare var process: Process;
 
-var process: Process;
+declare function require(id: string): any;
 
-function require(id: string): any;
-
-module "assert" {
+declare module "assert" {
     function ok(value?: any, message?: string): void;
     function fail(actual: any, expected: any, message: any, operator: any): void;    
     function equal(actual: any, expected: any, message?: string): void;
@@ -29,14 +39,16 @@ module "assert" {
     function ifError(value: any): void;
 }
 
-module "domain" {
+declare module "domain" {
+    import events = module("events");
+
     function create(): Domain;
     
-    interface Domain extends EventEmitter {
+    class Domain extends events.EventEmitter {
         run(fn: Function): void;
         members: any[];
-        add(emitter: EventEmitter): void;
-        remove(emitter: EventEmitter): void;
+        add(emitter: events.EventEmitter): void;
+        remove(emitter: events.EventEmitter): void;
         bind(callback: Function): Function;
         intercept(callback: Function): Function;
         dispose(): void;

@@ -19,7 +19,7 @@
                     .replace(/\\+|\/+/g, "/")
                     .replace(/^\.\/|\/\.(\/)/g, "$1");
                 return global[name]; 
-            }, global["Future1/tests"] = { });
+            }, global["tests"] = { });
     }
 })
 (function (require, exports) {

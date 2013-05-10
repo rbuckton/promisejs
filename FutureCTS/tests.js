@@ -6,7 +6,7 @@
  */
 (function (definition, global) {
     if (typeof define === "function" && define.amd) {
-        define(["require", "exports", "./futures"], definition);
+        define(["require", "exports"], definition);
     }
     else if (typeof require === "function" && typeof exports === "object" && typeof module === "object") {
         definition(require, module["exports"] || exports);
@@ -23,10 +23,19 @@
     }
 })
 (function (require, exports) {
-    var futures = require("./futures")
-    var assert = require("assert")
-    var domain = require("domain")
+    var __extends = this.__extends || function (d, b) {
+        function __() { this.constructor = d; }
+        __.prototype = b.prototype;
+        d.prototype = new __();
+    };
+    var futures = require("./futures");
+    var tasks = require("./tasks");
+    var events = require("events");
+    var assert = require("assert");
+    var domain = require("domain");
+    var _ = events.EventEmitter;
     var Future = futures.Future;
+    var CancellationSource = tasks.CancellationSource;
     var tests = [
         function Future_accept_value() {
             Future.accept(1).done(function (v) {
@@ -51,9 +60,10 @@
             }, assert.ifError);
         }, 
         function Future_resolve_FutureFuture() {
-            var FF = Future.accept(Future.accept(1));
+            var F = Future.accept(1);
+            var FF = Future.accept(F);
             Future.resolve(FF).done(function (v) {
-                return assert.equal(v, 1);
+                return assert.equal(v, F);
             }, assert.ifError);
         }, 
         function Future_reject_value() {
@@ -98,11 +108,12 @@
             }, assert.ifError);
         }, 
         function FutureResolver_resolve_FutureFuture() {
-            var FF = Future.accept(Future.accept(1));
+            var F = Future.accept(1);
+            var FF = Future.accept(F);
             new Future(function (resolver) {
                 return resolver.resolve(FF);
             }).done(function (v) {
-                return assert.equal(v, 1);
+                return assert.equal(v, F);
             }, assert.ifError);
         }, 
         function FutureResolver_reject_value() {
@@ -134,7 +145,13 @@
                 return assert.equal(e, "error");
             });
         }, 
-        function Future_accept_Future_then() {
+        function Future_accept_Future_then_none() {
+            var F = Future.accept(1);
+            Future.accept(F).then().done(function (v) {
+                return assert.equal(v, F);
+            }, assert.ifError);
+        }, 
+        function Future_accept_Future_then_idish() {
             var F = Future.accept(1);
             Future.accept(F).then(function (v) {
                 return v;
@@ -143,11 +160,12 @@
             }, assert.ifError);
         }, 
         function Future_accept_FutureFuture_then() {
-            var F = Future.accept(Future.accept(1));
-            Future.accept(F).then(function (v) {
+            var F = Future.accept(1);
+            var FF = Future.accept(F);
+            Future.accept(FF).then(function (v) {
                 return v;
             }).done(function (v) {
-                return assert.equal(v, 1);
+                return assert.equal(v, F);
             }, assert.ifError);
         }, 
         function Future_accept_Future_then_accept() {
@@ -278,8 +296,10 @@
         function some_reject2() {
             var F0 = Future.reject("error0");
             var F1 = Future.reject("error1");
-            Future.some(F1, F0).done(assert.ifError, function (e) {
-                return assert.ok(Array.isArray(e) && e[0] == "error0" && e[1] == "error1");
+            Future.some(F0, F1).done(assert.ifError, function (e) {
+                assert.ok(Array.isArray(e), "not array");
+                assert.equal(e[0], "error0");
+                assert.equal(e[1], "error1");
             });
         }, 
         function some_none() {
@@ -312,22 +332,198 @@
             Future.every().done(function (v) {
                 return assert.ok(v === undefined);
             }, assert.ifError);
+        }, 
+        function FutureFutureFuture_then_then_done() {
+            var F = Future.accept(1);
+            var FF = Future.accept(F);
+            var FFF = Future.accept(FF);
+            FFF.then().then().done(function (v) {
+                return assert.equal(v, FF);
+            }, assert.ifError);
+        }, 
+        function FutureForThenable_accept() {
+            var T = {
+                then: function () {
+                    assert.ok(false, "should not be called");
+                }
+            };
+            var F = Future.accept(T);
+            F.done(function (v) {
+                return assert.equal(v, T);
+            }, assert.ifError);
+        }, 
+        function FutureForThenable_resolve() {
+            var T = {
+                then: function () {
+                    assert.ok(false, "should not be called");
+                }
+            };
+            var F = Future.resolve(T);
+            F.done(function (v) {
+                return assert.equal(v, T);
+            }, assert.ifError);
+        }, 
+        function FutureForAssimilatedThenable_accept() {
+            var T = {
+                then: function (resolve, reject) {
+                    resolve(1);
+                }
+            };
+            var F = Future.from(T);
+            var FF = Future.accept(F);
+            FF.done(function (v) {
+                return assert.equal(v, F);
+            }, assert.ifError);
+        }, 
+        function FutureForAssimilatedThenable_resolve() {
+            var T = {
+                then: function (resolve, reject) {
+                    resolve(1);
+                }
+            };
+            var F = Future.from(T);
+            var FF = Future.resolve(F);
+            FF.done(function (v) {
+                return assert.equal(v, 1);
+            }, assert.ifError);
+        }, 
+        function FutureForAssimilatedNestedThenable_accept() {
+            var T1 = {
+                then: function (resolve, reject) {
+                    resolve(1);
+                }
+            };
+            var T2 = {
+                then: function (resolve, reject) {
+                    resolve(T1);
+                }
+            };
+            var F = Future.from(T2);
+            var FF = Future.accept(F);
+            FF.done(function (v) {
+                return assert.equal(v, F);
+            }, assert.ifError);
+        }, 
+        function FutureForAssimilatedNestedThenable_resolve() {
+            var T1 = {
+                then: function (resolve, reject) {
+                    resolve(1);
+                }
+            };
+            var T2 = {
+                then: function (resolve, reject) {
+                    resolve(T1);
+                }
+            };
+            var F = Future.from(T2);
+            var FF = Future.resolve(F);
+            FF.done(function (v) {
+                return assert.equal(v, 1);
+            }, assert.ifError);
+        }, 
+        function Cancel_Future() {
+            var C = new CancellationSource();
+            var R;
+            var F = new Future(function (resolver) {
+                R = resolver;
+            }, C.token);
+            C.cancel();
+            F.done(assert.ifError, assert.ifError);
+        }, 
+        function Cancel_Future_setTimeout() {
+            var C = new CancellationSource();
+            var F = new Future(function (resolver) {
+                var timerId = setTimeout(function () {
+                    resolver.resolve(1);
+                    C.token.unregister(handle);
+                }, 1);
+                var handle = C.token.register(function () {
+                    clearTimeout(timerId);
+                });
+            }, C.token);
+            C.cancel();
+            F.done(assert.ifError, assert.ifError);
         }];
-    var errors = [];
-    var count = 0;
-    var failed = 0;
-    tests.forEach(function (test) {
-        count++;
-        var d = domain.create();
-        d.on("error", function (e) {
-            failed++;
-            errors.push("Test failed: " + (test).name + ". Message:", e.toString(), "");
-            process.nextTick(function () {
+    var TestCase = (function (_super) {
+        __extends(TestCase, _super);
+        function TestCase(test) {
+            _super.call(this);
+            this.requested = 0;
+            this.completed = 0;
+            this.test = test;
+            this.name = (test).name;
+        }
+        TestCase.prototype.run = function () {
+            var _this = this;
+            this.domain = domain.create();
+            this.domain.on("error", function (e) {
+                _this.emit("fail", e);
+                _this.emit("done");
             });
-        });
-        d.run(test);
-    });
-    process.on("exit", function () {
-        console.log("\r\n%sdone. succeeded: %s, failed: %s\r\n", errors.concat("").join("\r\n"), count - failed, failed);
-    });
+            this.domain.run(function () {
+                _this.nextTick = process.nextTick;
+                process.nextTick = function (task) {
+                    _this.requested++;
+                    _this.nextTick.call(process, function () {
+                        _this.completed++;
+                        _this.exec(task);
+                    });
+                };
+                _this.emit("start");
+                _this.exec(_this.test);
+            });
+        };
+        TestCase.prototype.exec = function (task) {
+            task();
+            if (this.completed === this.requested) {
+                this.emit("pass");
+                this.emit("done");
+            }
+        };
+        return TestCase;
+    })(events.EventEmitter);
+    var TestRun = (function () {
+        function TestRun(tests) {
+            var _this = this;
+            this.errors = [];
+            this.requested = 0;
+            this.completed = 0;
+            this.passed = 0;
+            this.failed = 0;
+            this.testCases = tests.map(function (test) {
+                var testCase = new TestCase(test);
+                testCase.on("start", function () {
+                    _this.requested++;
+                });
+                testCase.on("pass", function () {
+                    _this.passed++;
+                });
+                testCase.on("fail", function (e) {
+                    _this.failed++;
+                    _this.errors.push("Test failed: " + testCase.name + ". Message:", (e && e.stack) ? e.stack : e, "");
+                });
+                testCase.on("done", function () {
+                    _this.completed++;
+                    if (_this.requested === _this.completed) {
+                        _this.done();
+                    }
+                });
+                return testCase;
+            });
+        }
+        TestRun.prototype.run = function () {
+            this.testCases.forEach(function (testCase) {
+                return testCase.run();
+            });
+        };
+        TestRun.prototype.done = function () {
+            console.log("\r\n%sdone. succeeded: %s, failed: %s, total: %s\r\n", this.errors.concat("").join("\r\n"), this.passed, this.failed, this.requested);
+        };
+        TestRun.run = function run(tests) {
+            var list = new TestRun(tests);
+            list.run();
+        };
+        return TestRun;
+    })();
+    TestRun.run(tests);
 }, this);

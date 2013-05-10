@@ -35,11 +35,31 @@ task("Future2-build", ["Future2/symbols.js", "Future2/futures.js", "Future2/test
 test("Future2-test", ["Future2-build"], "Future2/tests.js");
 clean("Future2-clean", [], ["Future2/symbols.js", "Future2/futures.js", "Future2/tests.js", "obj/Future2"]);
 
+// futureCTS
+file("FutureCTS/symbols.ts");
+file("FutureCTS/lists.ts");
+file("FutureCTS/tasks.ts");
+file("FutureCTS/futures.ts");
+file("FutureCTS/tests.ts");
+file("FutureCTS/eventstream.ts")
+file("FutureCTS/httprequest.ts")
+directory("obj/FutureCTS", ["obj"]);
+tsc("FutureCTS/symbols.js", ["obj/FutureCTS"], "FutureCTS/symbols.ts", { module: "umd", obj: "obj/FutureCTS", experimental: true });
+tsc("FutureCTS/lists.js", ["obj/FutureCTS"], "FutureCTS/lists.ts", { module: "umd", obj: "obj/FutureCTS", experimental: true });
+tsc("FutureCTS/tasks.js", ["obj/FutureCTS", "FutureCTS/symbols.js", "FutureCTS/lists.js"], "FutureCTS/tasks.ts", { module: "umd", obj: "obj/FutureCTS", experimental: true });
+tsc("FutureCTS/futures.js", ["obj/FutureCTS", "FutureCTS/symbols.js", "FutureCTS/lists.js", "FutureCTS/tasks.js"], "FutureCTS/futures.ts", { module: "umd", obj: "obj/FutureCTS", experimental: true });
+tsc("FutureCTS/eventstream.js", ["obj/FutureCTS", "FutureCTS/symbols.js", "FutureCTS/lists.js", "FutureCTS/tasks.js", "FutureCTS/futures.js"], "FutureCTS/eventstream.ts", { module: "umd", obj: "obj/FutureCTS", experimental: true });
+tsc("FutureCTS/httprequest.js", ["obj/FutureCTS", "FutureCTS/symbols.js", "FutureCTS/lists.js", "FutureCTS/tasks.js", "FutureCTS/futures.js", "FutureCTS/eventstream.js"], "FutureCTS/httprequest.ts", { module: "umd", obj: "obj/FutureCTS", experimental: true  });
+tsc("FutureCTS/tests.js", ["obj/FutureCTS", "FutureCTS/lists.js", "FutureCTS/tasks.js", "FutureCTS/futures.js", "FutureCTS/eventstream.js", "FutureCTS/httprequest.js"], "FutureCTS/tests.ts", { module: "umd", obj: "obj/FutureCTS", experimental: true });
+task("FutureCTS-build", ["FutureCTS/symbols.js", "FutureCTS/lists.js", "FutureCTS/tasks.js", "FutureCTS/futures.js" /*, "FutureCTS/eventstream.js", "FutureCTS/httprequest.js", "FutureCTS/tests.js" */]);
+test("FutureCTS-test", ["FutureCTS-build"], "FutureCTS/tests.js");
+clean("FutureCTS-clean", [], ["FutureCTS/symbols.js", "FutureCTS/lists.js", "FututeCTS/tasks.js", "FutureCTS/futures.js", "FutureCTS/eventstream.js", "FutureCTS/httprequest.js", "FutureCTS/tests.js", "obj/FutureCTS"]);
+
 task("default", ["test"]);
-task("build", ["Future0-build", "Future1-build", "Future2-build"]);
-task("clean", ["Future0-clean", "Future1-clean", "Future2-clean"]);
+task("build", ["Future0-build", "Future1-build", "Future2-build", "FutureCTS-build"]);
+task("clean", ["Future0-clean", "Future1-clean", "Future2-clean", "FutureCTS-clean"]);
 task("rebuild", ["clean", "build"]);
-task("test", ["Future0-test", "Future1-test", "Future2-test"]);
+task("test", ["Future0-test", "Future1-test", "Future2-test", "FutureCTS-test"]);
 task("world", ["clean", "build", "test"]);
 
 /** Copies properties from one object to another
@@ -63,8 +83,8 @@ function copy(dest, source) {
     return dest;
 }
 
-function trimExtension(path) {
-    return String(path).replace(/\.[a-z_\-0-9]+$/i, "");
+function trimExtension(file) {
+    return path.basename(file, ".js");
 }
 
 /** Defines a compile task
@@ -89,6 +109,7 @@ function tsc(target, prereqs, sources, options) {
         
         var out = target;
         var cmd = "tsc";
+        if (options.experimental) cmd = "node ./bin/tsc";
         
         if (options.declaration) cmd += " --declaration";
         if (options.cflowu) cmd += " --cflowu";
