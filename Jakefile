@@ -62,7 +62,7 @@ var modules = [
     tasks,
     futures,
     //eventstream, 
-    //httpclient, 
+    httpclient, 
     tests
 ];
 
