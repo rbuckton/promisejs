@@ -1,5 +1,5 @@
-/// <reference path="lib/timers.d.ts" />
-/// <reference path="lib/node.d.ts" />
+/// <reference path="../lib/timers.d.ts" />
+/// <reference path="../lib/node.d.ts" />
 /*!
  *
  * Copyright 2013 Ron A. Buckton under the terms of the MIT license found at:

@@ -1,4 +1,4 @@
-/// <reference path="lib/node.d.ts" />
+/// <reference path="../lib/node.d.ts" />
 import futures = module("futures");
 import tasks = module("tasks");
 import events = module("events");

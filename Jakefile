@@ -9,49 +9,49 @@ var dirs = ["obj", "built"];
 
 var symbols = {
     target: "built/symbols.js",
-    inputs: ["symbols.ts"],
+    inputs: ["src/symbols.ts"],
     outputs: ["built/symbols.js"],
-    deps: [dirs]
+    deps: [dirs, "Jakefile", "src/umd.tmpl"]
 };
 
 var lists = {
     target: "built/lists.js",
-    inputs: ["lists.ts"],
+    inputs: ["src/lists.ts"],
     outputs: ["built/lists.js"],
     deps: [symbols]
 };
 
 var tasks = {
     target: "built/tasks.js",
-    inputs: ["tasks.ts"],
+    inputs: ["src/tasks.ts"],
     outputs: ["built/tasks.js"],
     deps: [symbols, lists]
 };
 
 var futures = {
     target: "built/futures.js",
-    inputs: ["futures.ts"],
+    inputs: ["src/futures.ts"],
     outputs: ["built/futures.js"],
     deps: [symbols, lists, tasks]
 };
 
 var eventstream = {
     target: "built/eventstream.js",
-    inputs: ["eventstream.ts"],
+    inputs: ["src/eventstream.ts"],
     outputs: ["built/eventstream.js"],
     deps: [symbols, lists, tasks, futures]
 };
 
 var httpclient = {
     target: "built/httpclient.js",
-    inputs: ["httpclient.ts"],
+    inputs: ["src/httpclient.ts"],
     outputs: ["built/httpclient.js"],
     deps: [symbols, lists, tasks, futures]
 };
 
 var tests = {
     target: "built/tests.js",
-    inputs: ["tests.ts"],
+    inputs: ["src/tests.ts"],
     outputs: ["built/tests.js"],
     deps: [symbols, lists, tasks, futures, httpclient]
 }
@@ -193,7 +193,7 @@ function tsc(target, prereqs, sources, options) {
                     }
                     
                     // load the umd template
-                    var umdSrc = fs.readFileSync("txt/umd.pre.js").toString();
+                    var umdSrc = fs.readFileSync("src/umd.tmpl").toString();
                     
                     // transform the template
                     var finalSrc = umdSrc.replace(/\${(\w+)}/gi, function (_, id) {

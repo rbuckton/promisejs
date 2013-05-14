@@ -24,7 +24,7 @@
 		"type": "MIT",
 		"url": "http://github.com/rbuckton/promisejs/raw/master/LICENSE"
 	}],
-	"main": "futures.js",
+	"main": "built/futures.js",
 	"repository": {
 		"type": "git",
 		"url": "git://github.com/rbuckton/promisejs.git"
