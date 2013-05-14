@@ -19,7 +19,7 @@
                     .replace(/\\+|\/+/g, "/")
                     .replace(/^\.\/|\/\.(\/)/g, "$1");
                 return global[name]; 
-            }, global["httprequest"] = { });
+            }, global["httpclient"] = { });
     }
 })
 (function (require, exports) {

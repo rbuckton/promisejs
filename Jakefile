@@ -1,66 +1,112 @@
 var fs = require("fs");
 var path = require("path");
+var opts = { module: "umd", obj: "obj", experimental: true };
 
 directory("obj");
+directory("built");
 
-// future0
-file("Future0/futures.ts");
-file("Future0/tests.ts");
-directory("obj/Future0", ["obj"]);
-tsc("Future0/futures.js", ["obj/Future0"], "Future0/futures.ts", { module: "umd", obj: "obj/Future0" });
-tsc("Future0/tests.js", ["obj/Future0", "Future0/futures.js"], "Future0/tests.ts", { module: "umd", obj: "obj/Future0" });
-task("Future0-build", ["Future0/futures.js", "Future0/tests.js"]);
-test("Future0-test", ["Future0-build"], "Future0/tests.js");
-clean("Future0-clean", [], ["Future0/futures.js", "Future0/tests.js", "obj/Future0"]);
+var dirs = ["obj", "built"];
 
-// future1
-file("Future1/futures.ts");
-file("Future1/tests.ts");
-directory("obj/Future1", ["obj"]);
-tsc("Future1/futures.js", ["obj/Future1"], "Future1/futures.ts", { module: "umd", obj: "obj/Future1" });
-tsc("Future1/tests.js", ["obj/Future1", "Future1/futures.js"], "Future1/tests.ts", { module: "umd", obj: "obj/Future1" });
-task("Future1-build", ["Future1/futures.js", "Future1/tests.js"]);
-test("Future1-test", ["Future1/"], "Future1/tests.js");
-clean("Future1-clean", [], ["Future1/futures.js", "Future1/tests.js", "obj/Future1"]);
+var symbols = {
+    target: "built/symbols.js",
+    inputs: ["symbols.ts"],
+    outputs: ["built/symbols.js"],
+    deps: [dirs]
+};
 
-// future2
-file("Future2/symbols.ts");
-file("Future2/futures.ts");
-file("Future2/tests.ts");
-directory("obj/Future2", ["obj"]);
-tsc("Future2/symbols.js", ["obj/Future2"], "Future2/symbols.ts", { module: "umd", obj: "obj/Future2" });
-tsc("Future2/futures.js", ["obj/Future2", "Future2/symbols.js"], "Future2/futures.ts", { module: "umd", obj: "obj/Future2"  });
-tsc("Future2/tests.js", ["obj/Future2", "Future2/futures.js"], "Future2/tests.ts", { module: "umd", obj: "obj/Future2"  });
-task("Future2-build", ["Future2/symbols.js", "Future2/futures.js", "Future2/tests.js"]);
-test("Future2-test", ["Future2-build"], "Future2/tests.js");
-clean("Future2-clean", [], ["Future2/symbols.js", "Future2/futures.js", "Future2/tests.js", "obj/Future2"]);
+var lists = {
+    target: "built/lists.js",
+    inputs: ["lists.ts"],
+    outputs: ["built/lists.js"],
+    deps: [symbols]
+};
 
-// futureCTS
-file("FutureCTS/symbols.ts");
-file("FutureCTS/lists.ts");
-file("FutureCTS/tasks.ts");
-file("FutureCTS/futures.ts");
-file("FutureCTS/tests.ts");
-file("FutureCTS/eventstream.ts")
-file("FutureCTS/httpclient.ts")
-directory("obj/FutureCTS", ["obj"]);
-tsc("FutureCTS/symbols.js", ["obj/FutureCTS"], "FutureCTS/symbols.ts", { module: "umd", obj: "obj/FutureCTS", experimental: true });
-tsc("FutureCTS/lists.js", ["obj/FutureCTS"], "FutureCTS/lists.ts", { module: "umd", obj: "obj/FutureCTS", experimental: true });
-tsc("FutureCTS/tasks.js", ["obj/FutureCTS", "FutureCTS/symbols.js", "FutureCTS/lists.js"], "FutureCTS/tasks.ts", { module: "umd", obj: "obj/FutureCTS", experimental: true });
-tsc("FutureCTS/futures.js", ["obj/FutureCTS", "FutureCTS/symbols.js", "FutureCTS/lists.js", "FutureCTS/tasks.js"], "FutureCTS/futures.ts", { module: "umd", obj: "obj/FutureCTS", experimental: true });
-tsc("FutureCTS/eventstream.js", ["obj/FutureCTS", "FutureCTS/symbols.js", "FutureCTS/lists.js", "FutureCTS/tasks.js", "FutureCTS/futures.js"], "FutureCTS/eventstream.ts", { module: "umd", obj: "obj/FutureCTS", experimental: true });
-tsc("FutureCTS/httpclient.js", ["obj/FutureCTS", "FutureCTS/symbols.js", "FutureCTS/lists.js", "FutureCTS/tasks.js", "FutureCTS/futures.js"], "FutureCTS/httpclient.ts", { module: "umd", obj: "obj/FutureCTS", experimental: true  });
-tsc("FutureCTS/tests.js", ["obj/FutureCTS", "FutureCTS/lists.js", "FutureCTS/tasks.js", "FutureCTS/futures.js", "FutureCTS/eventstream.js", "FutureCTS/httpclient.js"], "FutureCTS/tests.ts", { module: "umd", obj: "obj/FutureCTS", experimental: true });
-task("FutureCTS-build", ["FutureCTS/symbols.js", "FutureCTS/lists.js", "FutureCTS/tasks.js", "FutureCTS/futures.js" /*, "FutureCTS/eventstream.js" */, "FutureCTS/httpclient.js" /*, "FutureCTS/tests.js" */]);
-test("FutureCTS-test", ["FutureCTS-build"], "FutureCTS/tests.js");
-clean("FutureCTS-clean", [], ["FutureCTS/symbols.js", "FutureCTS/lists.js", "FututeCTS/tasks.js", "FutureCTS/futures.js", "FutureCTS/eventstream.js", "FutureCTS/httpclient.js", "FutureCTS/tests.js", "obj/FutureCTS"]);
+var tasks = {
+    target: "built/tasks.js",
+    inputs: ["tasks.ts"],
+    outputs: ["built/tasks.js"],
+    deps: [symbols, lists]
+};
 
-task("default", ["test"]);
-task("build", ["Future0-build", "Future1-build", "Future2-build", "FutureCTS-build"]);
-task("clean", ["Future0-clean", "Future1-clean", "Future2-clean", "FutureCTS-clean"]);
+var futures = {
+    target: "built/futures.js",
+    inputs: ["futures.ts"],
+    outputs: ["built/futures.js"],
+    deps: [symbols, lists, tasks]
+};
+
+var eventstream = {
+    target: "built/eventstream.js",
+    inputs: ["eventstream.ts"],
+    outputs: ["built/eventstream.js"],
+    deps: [symbols, lists, tasks, futures]
+};
+
+var httpclient = {
+    target: "built/httpclient.js",
+    inputs: ["httpclient.ts"],
+    outputs: ["built/httpclient.js"],
+    deps: [symbols, lists, tasks, futures]
+};
+
+var tests = {
+    target: "built/tests.js",
+    inputs: ["tests.ts"],
+    outputs: ["built/tests.js"],
+    deps: [symbols, lists, tasks, futures, httpclient]
+}
+
+var modules = [
+    symbols,
+    lists,
+    tasks,
+    futures,
+    //eventstream, 
+    //httpclient, 
+    tests
+];
+
+// register all modules
+modules.forEach(function (module) {
+    var deps = [];
+    var depsmap = {};
+
+    var depfind = function (dep) {
+        var stack = [dep];
+        while (stack.length) {
+            dep = stack.pop();
+            if (typeof dep === "string") {
+                if (!depsmap.hasOwnProperty(dep)) {
+                    deps.push(dep);
+                    depsmap[dep] = true;
+                }
+            }
+            else if (Array.isArray(dep)) {
+                stack = stack.concat(dep);
+            }
+            else if (Object(dep) === dep) {
+                stack = stack.concat(dep.outputs);
+            }
+        }
+    };
+
+    module.inputs.forEach(function (path) { 
+        file(path); 
+        depfind(path);
+    });
+
+    module.deps.forEach(depfind);
+
+    tsc(module.target, deps, module.inputs, { module: "umd", obj: "obj", experimental: true });    
+})
+
+task("default", ["build", "test"]);
+task("build", modules.map(function (module) { return module.target; }));
 task("rebuild", ["clean", "build"]);
-task("test", ["Future0-test", "Future1-test", "Future2-test", "FutureCTS-test"]);
-task("world", ["clean", "build", "test"]);
+task("world", ["clean", "build" , "test"]);
+
+clean("clean", [], modules.map(function (module) { return module.target; }));
+test("test", ["build"], ["built/tests.js"]);
 
 /** Copies properties from one object to another
   */
@@ -136,7 +182,7 @@ function tsc(target, prereqs, sources, options) {
                     var umd = copy({ }, options.umd);                
                     
                     // read the source
-                    var targetSrc = fs.readFileSync("obj/" + target).toString();
+                    var targetSrc = fs.readFileSync("obj/" + path.basename(target)).toString();
                     
                     // find the imports
                     var imports = [];

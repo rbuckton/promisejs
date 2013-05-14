@@ -1,0 +1,39 @@
+{
+	"name": "promisejs",
+	"version": "0.0.1",
+	"author": "Ron Buckton <rbuckton@chronicles.org> (https://github.com/rbuckton)",
+	"description": "An implementation of DOM Futures, with some additions",
+	"keywords": [
+		"promise",
+		"promises",
+		"promise-a",
+		"promise-a-plus",
+		"future",
+		"async",
+		"dom",
+		"node"
+	],
+	"contributors": [
+		"Ron Buckton <rbuckton@chronicles.org> (https://github.com/rbuckton)"
+	],
+	"bugs": {
+		"mail": "rbuckton@chronicles.org",
+		"url": "http://github.com/rbuckton/promisejs/issues"
+	},
+	"licenses": [{
+		"type": "MIT",
+		"url": "http://github.com/rbuckton/promisejs/raw/master/LICENSE"
+	}],
+	"main": "futures.js",
+	"repository": {
+		"type": "git",
+		"url": "git://github.com/rbuckton/promisejs.git"
+	},
+	"engines": {
+		"node": ">=0.6.0"
+	},
+	"dependencies": {},
+	"devDependencies": {
+		"jake": "*"
+	}
+}

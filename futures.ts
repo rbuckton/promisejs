@@ -1,5 +1,5 @@
-/// <reference path="../lib/timers.d.ts" />
-/// <reference path="../lib/node.d.ts" />
+/// <reference path="lib/timers.d.ts" />
+/// <reference path="lib/node.d.ts" />
 /*!
  *
  * Copyright 2013 Ron A. Buckton under the terms of the MIT license found at:
@@ -190,24 +190,6 @@ export class Future<T> {
         }
     }
     
-    ///** 
-    // * Creates a new Future that is already in the accepted state with the provided value as the result.
-    // * @param value The value for the Future
-    // * @returns A Future for the value.
-    // * 
-    // * @link http://dom.spec.whatwg.org/#dom-future-accept
-    // */
-    //public static accept<TResult>(value: TResult): Future<TResult>;
-
-    ///** 
-    // * Creates a new Future that is already in the accepted state with the provided value as the result.
-    // * @param value The value for the Future
-    // * @returns A Future for the value.
-    // * 
-    // * @link http://dom.spec.whatwg.org/#dom-future-accept
-    // */
-    //public static accept<TResult>(value: TResult): Future<TResult>;
-
     /** 
      * Creates a new Future that is already in the accepted state with the provided value as the result.
      * @param value The value for the Future
@@ -221,35 +203,35 @@ export class Future<T> {
         });
     }
     
-    ///** 
-    // * Creates a new Future that is resolved with the provided value. If the provided value is a Future, its completion is implicitly unwrapped to its accepted result.
-    // * @param value The value for the Future
-    // * @returns A Future for the value
-    // */
-    //public static resolve<TResult>(value: Future<TResult>): Future<TResult>;
+    /** 
+     * Creates a new Future that is resolved with the provided value. If the provided value is a Future, its completion is implicitly unwrapped to its accepted result.
+     * @param value The value for the Future
+     * @returns A Future for the value
+     */
+    public static resolve<TResultA>(value: Future<TResultA>): Future<TResultA>;
 
-    ///** 
-    // * Creates a new Future that is resolved with the provided value. If the provided value is a Future, its completion is implicitly unwrapped to its accepted result.
-    // * @param value The value for the Future
-    // * @returns A Future for the value
-    // */
-    //public static resolve<TResult>(value: TResult): Future<TResult>;
+    /** 
+     * Creates a new Future that is resolved with the provided value. If the provided value is a Future, its completion is implicitly unwrapped to its accepted result.
+     * @param value The value for the Future
+     * @param token The token to use for cancellation
+     * @returns A Future for the value
+     */
+    public static resolve<TResultB>(value: Future<TResultB>, token: tasks.CancellationToken): Future<TResultB>;
 
-    ///** 
-    // * Creates a new Future that is resolved with the provided value. If the provided value is a Future, its completion is implicitly unwrapped to its accepted result.
-    // * @param value The value for the Future
-    // * @param token The token to use for cancellation
-    // * @returns A Future for the value
-    // */
-    //public static resolve<TResult>(value: Future<TResult>, token: tasks.CancellationToken): Future<TResult>;
+    /** 
+     * Creates a new Future that is resolved with the provided value. If the provided value is a Future, its completion is implicitly unwrapped to its accepted result.
+     * @param value The value for the Future
+     * @returns A Future for the value
+     */
+    public static resolve<TResultC>(value: TResultC): Future<TResultC>;
 
-    ///** 
-    // * Creates a new Future that is resolved with the provided value. If the provided value is a Future, its completion is implicitly unwrapped to its accepted result.
-    // * @param value The value for the Future
-    // * @param token The token to use for cancellation
-    // * @returns A Future for the value
-    // */
-    //public static resolve(value: any, token: tasks.CancellationToken): Future;
+    /** 
+     * Creates a new Future that is resolved with the provided value. If the provided value is a Future, its completion is implicitly unwrapped to its accepted result.
+     * @param value The value for the Future
+     * @param token The token to use for cancellation
+     * @returns A Future for the value
+     */
+    public static resolve<TResultD>(value: TResultD, token: tasks.CancellationToken): Future<TResultD>;
 
     /** 
      * Creates a new Future that is resolved with the provided value. If the provided value is a Future, its completion is implicitly unwrapped to its accepted result.
@@ -265,14 +247,23 @@ export class Future<T> {
         }, token);
     }
     
-    ///** 
-    // * Creates a new Future that is already in the rejected state with the provided value as the result.
-    // * @param value The value for the Future
-    // * @returns A Future for the value.
-    // *
-    // * @link http://dom.spec.whatwg.org/#dom-future-reject
-    // */
-    //public static reject<TResult>(value: any): Future<TResult>;
+    /** 
+     * Creates a new Future that is already in the rejected state with the provided value as the result.
+     * @param value The value for the Future
+     * @returns A Future for the value.
+     *
+     * @link http://dom.spec.whatwg.org/#dom-future-reject
+     */
+    public static reject<TResultE>(value: any): Future<TResultE>;
+
+    /** 
+     * Creates a new Future that is already in the rejected state with the provided value as the result.
+     * @param value The value for the Future
+     * @returns A Future for the value.
+     *
+     * @link http://dom.spec.whatwg.org/#dom-future-reject
+     */
+    public static reject(value: any): Future<any>;
 
     /** 
      * Creates a new Future that is already in the rejected state with the provided value as the result.
@@ -287,23 +278,32 @@ export class Future<T> {
         });
     }
 
-    ///** 
-    // * Creates a Future that is resolved or rejected when the first of any of the values provided are resolved or rejected.
-    // * @param values The values to wait upon. 
-    // * @returns A new Future that is either resolved with the value of the first Future to resolve, or rejected with the error of the first Future that is rejected.
-    // *
-    // * @link http://dom.spec.whatwg.org/#dom-future-any (modified)
-    // */
-    //public static any<TResult>(...values: Future<TResult>[]): Future<TResult>;
+    /** 
+     * Creates a Future that is resolved or rejected when the first of any of the values provided are resolved or rejected.
+     * @param values The values to wait upon. 
+     * @returns A new Future that is either resolved with the value of the first Future to resolve, or rejected with the error of the first Future that is rejected.
+     *
+     * @link http://dom.spec.whatwg.org/#dom-future-any (modified)
+     */
+    public static any<TResultF>(...values: Future<TResultF>[]): Future<TResultF>;
 
-    ///** 
-    // * Creates a Future that is resolved or rejected when the first of any of the values provided are resolved or rejected.
-    // * @param values The values to wait upon. 
-    // * @returns A new Future that is either resolved with the value of the first Future to resolve, or rejected with the error of the first Future that is rejected.
-    // *
-    // * @link http://dom.spec.whatwg.org/#dom-future-any (modified)
-    // */
-    //public static any<TResult>(...values: any[]): Future<TResult>;
+    /** 
+     * Creates a Future that is resolved or rejected when the first of any of the values provided are resolved or rejected.
+     * @param values The values to wait upon. 
+     * @returns A new Future that is either resolved with the value of the first Future to resolve, or rejected with the error of the first Future that is rejected.
+     *
+     * @link http://dom.spec.whatwg.org/#dom-future-any (modified)
+     */
+    public static any<TResultG>(...values: any[]): Future<TResultG>;
+
+    /** 
+     * Creates a Future that is resolved or rejected when the first of any of the values provided are resolved or rejected.
+     * @param values The values to wait upon. 
+     * @returns A new Future that is either resolved with the value of the first Future to resolve, or rejected with the error of the first Future that is rejected.
+     *
+     * @link http://dom.spec.whatwg.org/#dom-future-any (modified)
+     */
+    public static any(...values: any[]): Future<any>;
 
     /** 
      * Creates a Future that is resolved or rejected when the first of any of the values provided are resolved or rejected.
@@ -333,27 +333,27 @@ export class Future<T> {
         });
     }
 
-    ///** 
-    // * Creates a Future that is resolved when all of the provided values have resolved, or rejected when any of the values provided are rejected.
-    // * @param values The values to wait upon. 
-    // * @returns A new Future that is either resolved with an array of the resolved values of all Futures, or rejected with the error of the first Future that is rejected.
-    // *
-    // * When the new Future is resolved, the order of the values in the result will be the same as the order of the Futures provided to Future.every.
-    // *
-    // * @link http://dom.spec.whatwg.org/#dom-future-every (modified)
-    // */
-    //public static every<TResult>(...values: Future<TResult>[]): Future<TResult>;
+    /** 
+     * Creates a Future that is resolved when all of the provided values have resolved, or rejected when any of the values provided are rejected.
+     * @param values The values to wait upon. 
+     * @returns A new Future that is either resolved with an array of the resolved values of all Futures, or rejected with the error of the first Future that is rejected.
+     *
+     * When the new Future is resolved, the order of the values in the result will be the same as the order of the Futures provided to Future.every.
+     *
+     * @link http://dom.spec.whatwg.org/#dom-future-every (modified)
+     */
+    public static every<TResultH>(...values: Future<TResultH>[]): Future<TResultH>;
 
-    ///** 
-    // * Creates a Future that is resolved when all of the provided values have resolved, or rejected when any of the values provided are rejected.
-    // * @param values The values to wait upon. 
-    // * @returns A new Future that is either resolved with an array of the resolved values of all Futures, or rejected with the error of the first Future that is rejected.
-    // *
-    // * When the new Future is resolved, the order of the values in the result will be the same as the order of the Futures provided to Future.every.
-    // *
-    // * @link http://dom.spec.whatwg.org/#dom-future-every (modified)
-    // */
-    //public static every<TResult>(...values: any[]): Future<TResult>;
+    /** 
+     * Creates a Future that is resolved when all of the provided values have resolved, or rejected when any of the values provided are rejected.
+     * @param values The values to wait upon. 
+     * @returns A new Future that is either resolved with an array of the resolved values of all Futures, or rejected with the error of the first Future that is rejected.
+     *
+     * When the new Future is resolved, the order of the values in the result will be the same as the order of the Futures provided to Future.every.
+     *
+     * @link http://dom.spec.whatwg.org/#dom-future-every (modified)
+     */
+    public static every<TResultI>(...values: any[]): Future<TResultI>;
 
     /** 
      * Creates a Future that is resolved when all of the provided values have resolved, or rejected when any of the values provided are rejected.
@@ -387,27 +387,27 @@ export class Future<T> {
         });
     }
 
-    ///** 
-    // * Creates a Future that is resolved or rejected when the first of any of the values provided are resolved or all are rejected.
-    // * @param values The values to wait upon. 
-    // * @returns A new Future that is either resolved with the value of the first Future to resolve, or rejected with an array of errors of all of the Futures that were rejected.
-    // *
-    // * If the new Future is rejected, the order of the errors in the result will be the same as the order of the Futures provided to Future.some.
-    // *
-    // * @link http://dom.spec.whatwg.org/#dom-future-some (modified)
-    // */
-    //public static some<TResult>(...values: Future<T>[]): Future<TResult>;
+    /** 
+     * Creates a Future that is resolved or rejected when the first of any of the values provided are resolved or all are rejected.
+     * @param values The values to wait upon. 
+     * @returns A new Future that is either resolved with the value of the first Future to resolve, or rejected with an array of errors of all of the Futures that were rejected.
+     *
+     * If the new Future is rejected, the order of the errors in the result will be the same as the order of the Futures provided to Future.some.
+     *
+     * @link http://dom.spec.whatwg.org/#dom-future-some (modified)
+     */
+    public static some<TResultJ>(...values: Future<TResultJ>[]): Future<TResultJ>;
 
-    ///** 
-    // * Creates a Future that is resolved or rejected when the first of any of the values provided are resolved or all are rejected.
-    // * @param values The values to wait upon. 
-    // * @returns A new Future that is either resolved with the value of the first Future to resolve, or rejected with an array of errors of all of the Futures that were rejected.
-    // *
-    // * If the new Future is rejected, the order of the errors in the result will be the same as the order of the Futures provided to Future.some.
-    // *
-    // * @link http://dom.spec.whatwg.org/#dom-future-some (modified)
-    // */
-    //public static some<TResult>(...values: any[]): Future<TResult>;
+    /** 
+     * Creates a Future that is resolved or rejected when the first of any of the values provided are resolved or all are rejected.
+     * @param values The values to wait upon. 
+     * @returns A new Future that is either resolved with the value of the first Future to resolve, or rejected with an array of errors of all of the Futures that were rejected.
+     *
+     * If the new Future is rejected, the order of the errors in the result will be the same as the order of the Futures provided to Future.some.
+     *
+     * @link http://dom.spec.whatwg.org/#dom-future-some (modified)
+     */
+    public static some<TResultK>(...values: any[]): Future<TResultK>;
     
     /** 
      * Creates a Future that is resolved or rejected when the first of any of the values provided are resolved or all are rejected.
@@ -418,9 +418,9 @@ export class Future<T> {
      *
      * @link http://dom.spec.whatwg.org/#dom-future-some (modified)
      */
-    public static some(...values: any[]): Future {
-        return new Future(resolver => {
-            var data: FutureData = FutureDataSym.get(resolver);
+    public static some(...values: any[]): Future<any> {
+        return new Future<any>(resolver => {
+            var data: FutureData<any> = FutureDataSym.get(resolver);
             if (!data || !symbols.hasBrand(resolver, FutureResolver)) throw new TypeError("'this' is not a FutureResolver object");
 
             var countdown = values.length;
@@ -441,20 +441,20 @@ export class Future<T> {
         });
     }
     
-    ///** 
-    // * Coerces a value into a Future. 
-    // * @param value The value to coerce
-    // * @returns A Future for the value.
-    // */
-    //public static from<TResult>(value: any): Future<TResult>;
+    /** 
+     * Coerces a value into a Future. 
+     * @param value The value to coerce
+     * @returns A Future for the value.
+     */
+    public static from<TResultL>(value: any): Future<TResultL>;
 
-    ///** 
-    // * Coerces a value into a Future. 
-    // * @param value The value to coerce
-    // * @param token The token to use for cancellation
-    // * @returns A Future for the value.
-    // */
-    //public static from<TResult>(value: any, token: tasks.CancellationToken): Future<TResult>;
+    /** 
+     * Coerces a value into a Future. 
+     * @param value The value to coerce
+     * @param token The token to use for cancellation
+     * @returns A Future for the value.
+     */
+    public static from<TResultM>(value: any, token: tasks.CancellationToken): Future<TResultM>;
 
     /** 
      * Coerces a value into a Future. 
@@ -468,7 +468,7 @@ export class Future<T> {
      * 
      * (not currently specified)
      */
-    public static from(value: any, token?: tasks.CancellationToken): Future {
+    public static from(value: any, token?: tasks.CancellationToken): Future<any> {
         if (Future.isFuture(value)) {
             return value;
         }
@@ -550,21 +550,21 @@ export class Future<T> {
      */
     public static sleep(ms: number, token: tasks.CancellationToken): Future<void>;
 
-    ///** 
-    // * Sleeps for a period of time before resolving the future
-    // * @param ms The number of milliseconds to wait before resolving
-    // * @param value The value to use for resolution when the future resolves
-    // * @returns The new Future
-    // */
-    //public static sleep<T>(ms: number, value: Future<T>): Future<T>;
+    /** 
+     * Sleeps for a period of time before resolving the future
+     * @param ms The number of milliseconds to wait before resolving
+     * @param value The value to use for resolution when the future resolves
+     * @returns The new Future
+     */
+    public static sleep<TResultN>(ms: number, value: Future<TResultN>): Future<TResultN>;
 
-    ///** 
-    // * Sleeps for a period of time before resolving the future
-    // * @param ms The number of milliseconds to wait before resolving
-    // * @param value The value to use for resolution when the future resolves
-    // * @returns The new Future
-    // */
-    //public static sleep<T>(ms: number, value: T): Future<T>;
+    /** 
+     * Sleeps for a period of time before resolving the future
+     * @param ms The number of milliseconds to wait before resolving
+     * @param value The value to use for resolution when the future resolves
+     * @returns The new Future
+     */
+    public static sleep<TResultO>(ms: number, value: TResultO): Future<TResultO>;
 
     /** 
      * Sleeps for a period of time before resolving the future
@@ -574,23 +574,23 @@ export class Future<T> {
      */
     public static sleep(ms: number, value: any): Future<any>;
 
-    ///** 
-    // * Sleeps for a period of time before resolving the future
-    // * @param ms The number of milliseconds to wait before resolving
-    // * @param value The value to use for resolution when the future resolves
-    // * @param token The token to use for cancellation.
-    // * @returns The new Future
-    // */
-    //public static sleep<T>(ms: number, value: Future<T>, token: tasks.CancellationToken): Future<T>;
+    /** 
+     * Sleeps for a period of time before resolving the future
+     * @param ms The number of milliseconds to wait before resolving
+     * @param value The value to use for resolution when the future resolves
+     * @param token The token to use for cancellation.
+     * @returns The new Future
+     */
+    public static sleep<TResultP>(ms: number, value: Future<TResultP>, token: tasks.CancellationToken): Future<TResultP>;
 
-    ///** 
-    // * Sleeps for a period of time before resolving the future
-    // * @param ms The number of milliseconds to wait before resolving
-    // * @param value The value to use for resolution when the future resolves
-    // * @param token The token to use for cancellation.
-    // * @returns The new Future
-    // */
-    //public static sleep<T>(ms: number, value: T, token: tasks.CancellationToken): Future<T>;
+    /** 
+     * Sleeps for a period of time before resolving the future
+     * @param ms The number of milliseconds to wait before resolving
+     * @param value The value to use for resolution when the future resolves
+     * @param token The token to use for cancellation.
+     * @returns The new Future
+     */
+    public static sleep<TResultQ>(ms: number, value: TResultQ, token: tasks.CancellationToken): Future<TResultQ>;
 
     /** 
      * Sleeps for a period of time before resolving the future
@@ -622,19 +622,19 @@ export class Future<T> {
         }, token);
     }
 
-    ///** 
-    // * Runs the supplied callback at the end of the current turn
-    // * @param func The callback to execute
-    // * @returns A Future for the result or exception from the callback
-    // */
-    //public static run<T>(func: () => Future<T>): Future<T>;
+    /** 
+     * Runs the supplied callback at the end of the current turn
+     * @param func The callback to execute
+     * @returns A Future for the result or exception from the callback
+     */
+    public static run<TResultR>(func: () => Future<TResultR>): Future<TResultR>;
 
-    ///** 
-    // * Runs the supplied callback at the end of the current turn
-    // * @param func The callback to execute
-    // * @returns A Future for the result or exception from the callback
-    // */
-    //public static run<T>(func: () => T): Future<T>;
+    /** 
+     * Runs the supplied callback at the end of the current turn
+     * @param func The callback to execute
+     * @returns A Future for the result or exception from the callback
+     */
+    public static run<TResultS>(func: () => TResultS): Future<TResultS>;
 
     /** 
      * Runs the supplied callback at the end of the current turn
@@ -650,21 +650,21 @@ export class Future<T> {
      */
     public static run(func: () => void): Future<void>;
 
-    ///** 
-    // * Runs the supplied callback at the end of the current turn
-    // * @param func The callback to execute
-    // * @param token The token to use for cancellation
-    // * @returns A Future for the result or exception from the callback
-    // */
-    //public static run<T>(func: () => Future<T>, token: tasks.CancellationToken): Future<T>;
+    /** 
+     * Runs the supplied callback at the end of the current turn
+     * @param func The callback to execute
+     * @param token The token to use for cancellation
+     * @returns A Future for the result or exception from the callback
+     */
+    public static run<TResultT>(func: () => Future<TResultT>, token: tasks.CancellationToken): Future<TResultT>;
 
-    ///** 
-    // * Runs the supplied callback at the end of the current turn
-    // * @param func The callback to execute
-    // * @param token The token to use for cancellation
-    // * @returns A Future for the result or exception from the callback
-    // */
-    //public static run<T>(func: () => T, token: tasks.CancellationToken): Future<T>;
+    /** 
+     * Runs the supplied callback at the end of the current turn
+     * @param func The callback to execute
+     * @param token The token to use for cancellation
+     * @returns A Future for the result or exception from the callback
+     */
+    public static run<TResultU>(func: () => TResultU, token: tasks.CancellationToken): Future<TResultU>;
 
     /** 
      * Runs the supplied callback at the end of the current turn
@@ -682,21 +682,21 @@ export class Future<T> {
      */
     public static run(func: () => void, token: tasks.CancellationToken): Future<void>;
 
-    ///** 
-    // * Runs the supplied callback at the end of the current turn
-    // * @param func The callback to execute
-    // * @param ms The number of milliseconds to wait before executing the callback
-    // * @returns A Future for the result or exception from the callback
-    // */
-    //public static run<T>(func: () => Future<T>, ms: number): Future<T>;
+    /** 
+     * Runs the supplied callback at the end of the current turn
+     * @param func The callback to execute
+     * @param ms The number of milliseconds to wait before executing the callback
+     * @returns A Future for the result or exception from the callback
+     */
+    public static run<TResultV>(func: () => Future<TResultV>, ms: number): Future<TResultV>;
 
-    ///** 
-    // * Runs the supplied callback at the end of the current turn
-    // * @param func The callback to execute
-    // * @param ms The number of milliseconds to wait before executing the callback
-    // * @returns A Future for the result or exception from the callback
-    // */
-    //public static run<T>(func: () => T, ms: number): Future<T>;
+    /** 
+     * Runs the supplied callback at the end of the current turn
+     * @param func The callback to execute
+     * @param ms The number of milliseconds to wait before executing the callback
+     * @returns A Future for the result or exception from the callback
+     */
+    public static run<TResultW>(func: () => TResultW, ms: number): Future<TResultW>;
 
     /** 
      * Runs the supplied callback at the end of the current turn
@@ -714,23 +714,23 @@ export class Future<T> {
      */
     public static run(func: () => void, ms: number): Future<void>;
 
-    ///** 
-    // * Runs the supplied callback at the end of the current turn
-    // * @param func The callback to execute
-    // * @param ms The number of milliseconds to wait before executing the callback
-    // * @param token The token to use for cancellation
-    // * @returns A Future for the result or exception from the callback
-    // */
-    //public static run<T>(func: () => Future<T>, ms: number, token: tasks.CancellationToken): Future<T>;
+    /** 
+     * Runs the supplied callback at the end of the current turn
+     * @param func The callback to execute
+     * @param ms The number of milliseconds to wait before executing the callback
+     * @param token The token to use for cancellation
+     * @returns A Future for the result or exception from the callback
+     */
+    public static run<TResultX>(func: () => Future<TResultX>, ms: number, token: tasks.CancellationToken): Future<TResultX>;
 
-    ///** 
-    // * Runs the supplied callback at the end of the current turn
-    // * @param func The callback to execute
-    // * @param ms The number of milliseconds to wait before executing the callback
-    // * @param token The token to use for cancellation
-    // * @returns A Future for the result or exception from the callback
-    // */
-    //public static run<T>(func: () => T, ms: number, token: tasks.CancellationToken): Future<T>;
+    /** 
+     * Runs the supplied callback at the end of the current turn
+     * @param func The callback to execute
+     * @param ms The number of milliseconds to wait before executing the callback
+     * @param token The token to use for cancellation
+     * @returns A Future for the result or exception from the callback
+     */
+    public static run<TResultY>(func: () => TResultY, ms: number, token: tasks.CancellationToken): Future<TResultY>;
 
     /** 
      * Runs the supplied callback at the end of the current turn

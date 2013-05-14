@@ -24,6 +24,7 @@
 })
 (function (require, exports) {
     var __extends = this.__extends || function (d, b) {
+        for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
         function __() { this.constructor = d; }
         __.prototype = b.prototype;
         d.prototype = new __();
@@ -33,406 +34,391 @@
     var events = require("events");
     var assert = require("assert");
     var domain = require("domain");
+    
     var _ = events.EventEmitter;
-    var Future = futures.Future;
     var CancellationSource = tasks.CancellationSource;
+    
     var tests = [
         function Future_accept_value() {
-            Future.accept(1).done(function (v) {
+            futures.Future.accept(1).done(function (v) {
                 return assert.equal(v, 1);
             }, assert.ifError);
-        }, 
+        },
         function Future_accept_Future() {
-            var F = Future.accept(1);
-            Future.accept(F).done(function (v) {
+            var F = futures.Future.accept(1);
+            futures.Future.accept(F).done(function (v) {
                 return assert.equal(v, F);
             }, assert.ifError);
-        }, 
+        },
         function Future_resolve_value() {
-            Future.resolve(1).done(function (v) {
+            futures.Future.resolve(1).done(function (v) {
                 return assert.equal(v, 1);
             }, assert.ifError);
-        }, 
+        },
         function Future_resolve_Future() {
-            var F = Future.accept(1);
-            Future.resolve(F).done(function (v) {
+            var F = futures.Future.accept(1);
+            futures.Future.resolve(F).done(function (v) {
                 return assert.equal(v, 1);
             }, assert.ifError);
-        }, 
+        },
         function Future_resolve_FutureFuture() {
-            var F = Future.accept(1);
-            var FF = Future.accept(F);
-            Future.resolve(FF).done(function (v) {
+            var F = futures.Future.accept(1);
+            var FF = futures.Future.accept(F);
+            futures.Future.resolve(FF).done(function (v) {
                 return assert.equal(v, F);
             }, assert.ifError);
-        }, 
+        },
         function Future_reject_value() {
-            Future.reject("error").done(assert.ifError, function (e) {
+            futures.Future.reject("error").done(assert.ifError, function (e) {
                 return assert.equal(e, "error");
             });
-        }, 
+        },
         function Future_reject_Future() {
-            var F = Future.accept("error");
-            Future.reject(F).done(assert.ifError, function (e) {
+            var F = futures.Future.accept("error");
+            futures.Future.reject(F).done(assert.ifError, function (e) {
                 return assert.equal(e, F);
             });
-        }, 
+        },
         function FutureResolver_accept_value() {
-            new Future(function (resolver) {
+            new futures.Future(function (resolver) {
                 return resolver.accept(1);
             }).done(function (v) {
                 return assert.equal(v, 1);
             }, assert.ifError);
-        }, 
+        },
         function FutureResolver_accept_Future() {
-            var F = Future.accept(1);
-            new Future(function (resolver) {
+            var F = futures.Future.accept(1);
+            new futures.Future(function (resolver) {
                 return resolver.accept(F);
             }).done(function (v) {
                 return assert.equal(v, F);
             }, assert.ifError);
-        }, 
+        },
         function FutureResolver_resolve_value() {
-            new Future(function (resolver) {
+            new futures.Future(function (resolver) {
                 return resolver.resolve(1);
             }).done(function (v) {
                 return assert.equal(v, 1);
             }, assert.ifError);
-        }, 
+        },
         function FutureResolver_resolve_Future() {
-            var F = Future.accept(1);
-            new Future(function (resolver) {
+            var F = futures.Future.accept(1);
+            new futures.Future(function (resolver) {
                 return resolver.resolve(F);
             }).done(function (v) {
                 return assert.equal(v, 1);
             }, assert.ifError);
-        }, 
+        },
         function FutureResolver_resolve_FutureFuture() {
-            var F = Future.accept(1);
-            var FF = Future.accept(F);
-            new Future(function (resolver) {
+            var F = futures.Future.accept(1);
+            var FF = futures.Future.accept(F);
+            new futures.Future(function (resolver) {
                 return resolver.resolve(FF);
             }).done(function (v) {
                 return assert.equal(v, F);
             }, assert.ifError);
-        }, 
+        },
         function FutureResolver_reject_value() {
-            new Future(function (resolver) {
+            new futures.Future(function (resolver) {
                 return resolver.reject("error");
             }).done(assert.ifError, function (e) {
                 return assert.equal(e, "error");
             });
-        }, 
+        },
         function FutureResolver_reject_Future() {
-            var F = Future.accept("error");
-            new Future(function (resolver) {
+            var F = futures.Future.accept("error");
+            new futures.Future(function (resolver) {
                 return resolver.reject(F);
             }).done(assert.ifError, function (e) {
                 return assert.equal(e, F);
             });
-        }, 
+        },
         function Future_accept_value_then() {
-            Future.accept(1).then(function (v) {
+            futures.Future.accept(1).then(function (v) {
                 return v;
             }).done(function (v) {
                 return assert.equal(v, 1);
             }, assert.ifError);
-        }, 
+        },
         function Future_accept_value_then_throw() {
-            Future.accept(1).then(function (v) {
+            futures.Future.accept(1).then(function (v) {
                 throw "error";
             }).done(assert.ifError, function (e) {
                 return assert.equal(e, "error");
             });
-        }, 
+        },
         function Future_accept_Future_then_none() {
-            var F = Future.accept(1);
-            Future.accept(F).then().done(function (v) {
+            var F = futures.Future.accept(1);
+            futures.Future.accept(F).then().done(function (v) {
                 return assert.equal(v, F);
             }, assert.ifError);
-        }, 
+        },
         function Future_accept_Future_then_idish() {
-            var F = Future.accept(1);
-            Future.accept(F).then(function (v) {
+            var F = futures.Future.accept(1);
+            futures.Future.accept(F).then(function (v) {
                 return v;
             }).done(function (v) {
                 return assert.equal(v, 1);
             }, assert.ifError);
-        }, 
+        },
         function Future_accept_FutureFuture_then() {
-            var F = Future.accept(1);
-            var FF = Future.accept(F);
-            Future.accept(FF).then(function (v) {
+            var F = futures.Future.accept(1);
+            var FF = futures.Future.accept(F);
+            futures.Future.accept(FF).then(function (v) {
                 return v;
             }).done(function (v) {
                 return assert.equal(v, F);
             }, assert.ifError);
-        }, 
+        },
         function Future_accept_Future_then_accept() {
-            var F = Future.accept(1);
-            Future.accept(F).then(function (v) {
-                return Future.accept(v);
+            var F = futures.Future.accept(1);
+            futures.Future.accept(F).then(function (v) {
+                return futures.Future.accept(v);
             }).done(function (v) {
                 return assert.equal(v, F);
             }, assert.ifError);
-        }, 
+        },
         function Future_accept_Future_then_resolve() {
-            var F = Future.accept(1);
-            Future.accept(F).then(function (v) {
-                return Future.resolve(v);
+            var F = futures.Future.accept(1);
+            futures.Future.accept(F).then(function (v) {
+                return futures.Future.resolve(v);
             }).done(function (v) {
                 return assert.equal(v, 1);
             }, assert.ifError);
-        }, 
+        },
         function Future_accept_Future_then_reject() {
-            var F = Future.accept(1);
-            Future.accept(F).then(function (v) {
-                return Future.reject("error");
+            var F = futures.Future.accept(1);
+            futures.Future.accept(F).then(function (v) {
+                return futures.Future.reject("error");
             }).done(assert.ifError, function (e) {
                 return assert.equal(e, "error");
             });
-        }, 
+        },
         function Future_resolve_value_then() {
-            Future.resolve(1).then(function (v) {
+            futures.Future.resolve(1).then(function (v) {
                 return v;
             }).done(function (v) {
                 return assert.equal(v, 1);
             }, assert.ifError);
-        }, 
+        },
         function Future_resolve_Future_then() {
-            var F = Future.accept(1);
-            Future.resolve(F).then(function (v) {
+            var F = futures.Future.accept(1);
+            futures.Future.resolve(F).then(function (v) {
                 return v;
             }).done(function (v) {
                 return assert.equal(v, 1);
             }, assert.ifError);
-        }, 
+        },
         function Future_resolve_FutureFuture_then() {
-            var F = Future.accept(Future.accept(1));
-            Future.resolve(F).then(function (v) {
+            var F = futures.Future.accept(futures.Future.accept(1));
+            futures.Future.resolve(F).then(function (v) {
                 return v;
             }).done(function (v) {
                 return assert.equal(v, 1);
             }, assert.ifError);
-        }, 
+        },
         function Future_resolve_Future_then_accept() {
-            var F = Future.accept(1);
-            Future.resolve(F).then(function (v) {
-                return Future.accept(v);
+            var F = futures.Future.accept(1);
+            futures.Future.resolve(F).then(function (v) {
+                return futures.Future.accept(v);
             }).done(function (v) {
                 return assert.equal(v, 1);
             }, assert.ifError);
-        }, 
+        },
         function Future_resolve_Future_then_resolve() {
-            var F = Future.accept(1);
-            Future.resolve(F).then(function (v) {
-                return Future.resolve(v);
+            var F = futures.Future.accept(1);
+            futures.Future.resolve(F).then(function (v) {
+                return futures.Future.resolve(v);
             }).done(function (v) {
                 return assert.equal(v, 1);
             }, assert.ifError);
-        }, 
+        },
         function Future_resolve_Future_then_reject() {
-            var F = Future.accept(1);
-            Future.resolve(F).then(function (v) {
-                return Future.reject("error");
+            var F = futures.Future.accept(1);
+            futures.Future.resolve(F).then(function (v) {
+                return futures.Future.reject("error");
             }).done(assert.ifError, function (e) {
                 return assert.equal(e, "error");
             });
-        }, 
+        },
         function Future_reject_value_then_resolve() {
-            Future.reject("error").then(null, function (e) {
+            futures.Future.reject("error").then(null, function (e) {
                 return 1;
             }).done(function (v) {
                 return assert.equal(v, 1);
             }, assert.ifError);
-        }, 
+        },
         function any_accept1_reject1() {
-            var F0 = Future.accept(1);
-            var F1 = Future.reject("error");
-            Future.any(F0, F1).done(function (v) {
+            var F0 = futures.Future.accept(1);
+            var F1 = futures.Future.reject("error");
+            futures.Future.any(F0, F1).done(function (v) {
                 return assert.equal(v, 1);
             }, assert.ifError);
-        }, 
+        },
         function any_reject1_accept1() {
-            var F0 = Future.reject("error");
-            var F1 = Future.accept(1);
-            Future.any(F0, F1).done(assert.ifError, function (e) {
+            var F0 = futures.Future.reject("error");
+            var F1 = futures.Future.accept(1);
+            futures.Future.any(F0, F1).done(assert.ifError, function (e) {
                 return assert.equal(e, "error");
             });
-        }, 
+        },
         function any_reject2() {
-            var F0 = Future.reject("error0");
-            var F1 = Future.reject("error1");
-            Future.any(F0, F1).done(assert.ifError, function (e) {
+            var F0 = futures.Future.reject("error0");
+            var F1 = futures.Future.reject("error1");
+            futures.Future.any(F0, F1).done(assert.ifError, function (e) {
                 return assert.equal(e, "error0");
             });
-        }, 
+        },
         function any_accept2() {
-            var F0 = Future.accept(1);
-            var F1 = Future.accept(2);
-            Future.any(F0, F1).done(function (v) {
+            var F0 = futures.Future.accept(1);
+            var F1 = futures.Future.accept(2);
+            futures.Future.any(F0, F1).done(function (v) {
                 return assert.equal(v, 1);
             }, assert.ifError);
-        }, 
+        },
         function any_none() {
-            Future.any().done(function (v) {
+            futures.Future.any().done(function (v) {
                 return assert.ok(v === undefined);
             }, assert.ifError);
-        }, 
+        },
         function some_accept1_reject1() {
-            var F0 = Future.accept(1);
-            var F1 = Future.reject("error");
-            Future.some(F0, F1).done(function (v) {
+            var F0 = futures.Future.accept(1);
+            var F1 = futures.Future.reject("error");
+            futures.Future.some(F0, F1).done(function (v) {
                 return assert.equal(v, 1);
             }, assert.ifError);
-        }, 
+        },
         function some_reject1_accept1() {
-            var F0 = Future.accept(1);
-            var F1 = Future.reject("error");
-            Future.some(F1, F0).done(function (v) {
+            var F0 = futures.Future.accept(1);
+            var F1 = futures.Future.reject("error");
+            futures.Future.some(F1, F0).done(function (v) {
                 return assert.equal(v, 1);
             }, assert.ifError);
-        }, 
+        },
         function some_reject2() {
-            var F0 = Future.reject("error0");
-            var F1 = Future.reject("error1");
-            Future.some(F0, F1).done(assert.ifError, function (e) {
+            var F0 = futures.Future.reject("error0");
+            var F1 = futures.Future.reject("error1");
+            futures.Future.some(F0, F1).done(assert.ifError, function (e) {
                 assert.ok(Array.isArray(e), "not array");
                 assert.equal(e[0], "error0");
                 assert.equal(e[1], "error1");
             });
-        }, 
+        },
         function some_none() {
-            Future.some().done(function (v) {
+            futures.Future.some().done(function (v) {
                 return assert.ok(v === undefined);
             }, assert.ifError);
-        }, 
+        },
         function every_accept1_reject1() {
-            var F0 = Future.accept(1);
-            var F1 = Future.reject("error");
-            Future.every(F0, F1).done(assert.ifError, function (e) {
+            var F0 = futures.Future.accept(1);
+            var F1 = futures.Future.reject("error");
+            futures.Future.every(F0, F1).done(assert.ifError, function (e) {
                 return assert.equal(e, "error");
             });
-        }, 
+        },
         function every_accept2() {
-            var F0 = Future.accept(1);
-            var F1 = Future.accept(2);
-            Future.every(F0, F1).done(function (v) {
+            var F0 = futures.Future.accept(1);
+            var F1 = futures.Future.accept(2);
+            futures.Future.every(F0, F1).done(function (v) {
                 return assert.ok(Array.isArray(v) && v[0] == 1 && v[1] == 2);
             }, assert.ifError);
-        }, 
+        },
         function every_reject2() {
-            var F0 = Future.reject("error0");
-            var F1 = Future.reject("error1");
-            Future.every(F0, F1).done(assert.ifError, function (e) {
+            var F0 = futures.Future.reject("error0");
+            var F1 = futures.Future.reject("error1");
+            futures.Future.every(F0, F1).done(assert.ifError, function (e) {
                 return assert.equal(e, "error0");
             });
-        }, 
+        },
         function every_none() {
-            Future.every().done(function (v) {
+            futures.Future.every().done(function (v) {
                 return assert.ok(v === undefined);
             }, assert.ifError);
-        }, 
+        },
         function FutureFutureFuture_then_then_done() {
-            var F = Future.accept(1);
-            var FF = Future.accept(F);
-            var FFF = Future.accept(FF);
+            var F = futures.Future.accept(1);
+            var FF = futures.Future.accept(F);
+            var FFF = futures.Future.accept(FF);
             FFF.then().then().done(function (v) {
                 return assert.equal(v, FF);
             }, assert.ifError);
-        }, 
+        },
         function FutureForThenable_accept() {
-            var T = {
-                then: function () {
+            var T = { then: function () {
                     assert.ok(false, "should not be called");
-                }
-            };
-            var F = Future.accept(T);
+                } };
+            var F = futures.Future.accept(T);
             F.done(function (v) {
                 return assert.equal(v, T);
             }, assert.ifError);
-        }, 
+        },
         function FutureForThenable_resolve() {
-            var T = {
-                then: function () {
+            var T = { then: function () {
                     assert.ok(false, "should not be called");
-                }
-            };
-            var F = Future.resolve(T);
+                } };
+            var F = futures.Future.resolve(T);
             F.done(function (v) {
                 return assert.equal(v, T);
             }, assert.ifError);
-        }, 
+        },
         function FutureForAssimilatedThenable_accept() {
-            var T = {
-                then: function (resolve, reject) {
+            var T = { then: function (resolve, reject) {
                     resolve(1);
-                }
-            };
-            var F = Future.from(T);
-            var FF = Future.accept(F);
+                } };
+            var F = futures.Future.from(T);
+            var FF = futures.Future.accept(F);
             FF.done(function (v) {
                 return assert.equal(v, F);
             }, assert.ifError);
-        }, 
+        },
         function FutureForAssimilatedThenable_resolve() {
-            var T = {
-                then: function (resolve, reject) {
+            var T = { then: function (resolve, reject) {
                     resolve(1);
-                }
-            };
-            var F = Future.from(T);
-            var FF = Future.resolve(F);
+                } };
+            var F = futures.Future.from(T);
+            var FF = futures.Future.resolve(F);
             FF.done(function (v) {
                 return assert.equal(v, 1);
             }, assert.ifError);
-        }, 
+        },
         function FutureForAssimilatedNestedThenable_accept() {
-            var T1 = {
-                then: function (resolve, reject) {
+            var T1 = { then: function (resolve, reject) {
                     resolve(1);
-                }
-            };
-            var T2 = {
-                then: function (resolve, reject) {
+                } };
+            var T2 = { then: function (resolve, reject) {
                     resolve(T1);
-                }
-            };
-            var F = Future.from(T2);
-            var FF = Future.accept(F);
+                } };
+            var F = futures.Future.from(T2);
+            var FF = futures.Future.accept(F);
             FF.done(function (v) {
                 return assert.equal(v, F);
             }, assert.ifError);
-        }, 
+        },
         function FutureForAssimilatedNestedThenable_resolve() {
-            var T1 = {
-                then: function (resolve, reject) {
+            var T1 = { then: function (resolve, reject) {
                     resolve(1);
-                }
-            };
-            var T2 = {
-                then: function (resolve, reject) {
+                } };
+            var T2 = { then: function (resolve, reject) {
                     resolve(T1);
-                }
-            };
-            var F = Future.from(T2);
-            var FF = Future.resolve(F);
+                } };
+            var F = futures.Future.from(T2);
+            var FF = futures.Future.resolve(F);
             FF.done(function (v) {
                 return assert.equal(v, 1);
             }, assert.ifError);
-        }, 
+        },
         function Cancel_Future() {
             var C = new CancellationSource();
             var R;
-            var F = new Future(function (resolver) {
+            var F = new futures.Future(function (resolver) {
                 R = resolver;
             }, C.token);
             C.cancel();
             F.done(assert.ifError, assert.ifError);
-        }, 
+        },
         function Cancel_Future_setTimeout() {
             var C = new CancellationSource();
-            var F = new Future(function (resolver) {
+            var F = new futures.Future(function (resolver) {
                 var timerId = setTimeout(function () {
                     resolver.resolve(1);
                     C.token.unregister(handle);
@@ -443,7 +429,9 @@
             }, C.token);
             C.cancel();
             F.done(assert.ifError, assert.ifError);
-        }];
+        }
+    ];
+    
     var TestCase = (function (_super) {
         __extends(TestCase, _super);
         function TestCase(test) {
@@ -469,10 +457,12 @@
                         _this.exec(task);
                     });
                 };
+    
                 _this.emit("start");
                 _this.exec(_this.test);
             });
         };
+    
         TestCase.prototype.exec = function (task) {
             task();
             if (this.completed === this.requested) {
@@ -482,6 +472,7 @@
         };
         return TestCase;
     })(events.EventEmitter);
+    
     var TestRun = (function () {
         function TestRun(tests) {
             var _this = this;
@@ -516,14 +507,17 @@
                 return testCase.run();
             });
         };
+    
         TestRun.prototype.done = function () {
             console.log("\r\n%sdone. succeeded: %s, failed: %s, total: %s\r\n", this.errors.concat("").join("\r\n"), this.passed, this.failed, this.requested);
         };
-        TestRun.run = function run(tests) {
+    
+        TestRun.run = function (tests) {
             var list = new TestRun(tests);
             list.run();
         };
         return TestRun;
     })();
+    
     TestRun.run(tests);
 }, this);
