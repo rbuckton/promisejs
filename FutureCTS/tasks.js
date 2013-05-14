@@ -26,9 +26,8 @@
     var symbols = require("./symbols");
     var lists = require("./lists");
     
-    var __CancellationTokenData__ = new symbols.Symbol("CancellationTokenData@edf533f9-bae1-4a85-a3c1-1e191754155d");
-    var __CancellationSourceData__ = new symbols.Symbol("CancellationTokenSourceData@7d9c6295-bbfe-4d18-99b0-10583b920e9c");
-    var __DispatcherData__ = new symbols.Symbol("DispatcherData@cc25bb49-9c40-40aa-8503-fef7f6080a2c");
+    var CancellationDataSym = new symbols.Symbol("tasks.CancellationData");
+    var DispatcherDataSym = new symbols.Symbol("tasks.DispatcherData");
     
     var AggregateError = (function () {
         function AggregateError() {
@@ -60,121 +59,11 @@
         }
         return AggregateError;
     })();
+    exports.AggregateError = AggregateError;
     
     AggregateError.prototype = Object.create(Error.prototype);
     
-    symbols.brand.set(AggregateError.prototype, "AggregateError");
-    
-    var CancellationData = (function () {
-        function CancellationData(source, token) {
-            this.closed = false;
-            this.canceled = false;
-            this.source = source;
-            this.token = token;
-        }
-        CancellationData.prototype.register = function (cleanup) {
-            if (this.canceled) {
-                cleanup();
-                return 0;
-            }
-    
-            if (CancellationData.nextHandle >= CancellationData.MAX_HANDLE) {
-                CancellationData.nextHandle = 1;
-            }
-            var handle = CancellationData.nextHandle++;
-    
-            if (this.cleanupCallbacks == null) {
-                this.cleanupCallbacks = new lists.LinkedList();
-            }
-    
-            var node = {
-                handle: handle,
-                value: cleanup
-            };
-            this.cleanupCallbacks.insertAfter(this.cleanupCallbacks.tail, node);
-            return handle;
-        };
-    
-        CancellationData.prototype.unregister = function (handle) {
-            if (this.cleanupCallbacks) {
-                var filter = function (node) {
-                    return node.handle === handle;
-                };
-                var found = this.cleanupCallbacks.find(filter);
-                if (found) {
-                    this.cleanupCallbacks.remove(found);
-                }
-            }
-        };
-    
-        CancellationData.prototype.linkTo = function (token) {
-            var _this = this;
-            if (this.links == null) {
-                this.links = new lists.LinkedList();
-            }
-    
-            var handle = token.register(function () {
-                _this.cancel();
-            });
-    
-            var node = {
-                handle: handle,
-                value: function () {
-                    token.unregister(handle);
-                }
-            };
-    
-            this.links.insertAfter(this.links.tail, node);
-        };
-    
-        CancellationData.prototype.cancel = function () {
-            if (this.canceled) {
-                return;
-            }
-    
-            this.canceled = true;
-    
-            var errors;
-            var callback = function (node) {
-                try  {
-                    node.value.call(null);
-                } catch (e) {
-                    if (errors == null) {
-                        errors = [];
-                    }
-    
-                    errors.push(e);
-                }
-            };
-    
-            this.cleanupCallbacks.forEach(callback);
-            this.cleanupCallbacks = null;
-    
-            if (errors) {
-                throw new AggregateError(null, errors);
-            }
-        };
-    
-        CancellationData.prototype.cancelAfter = function (ms) {
-            var _this = this;
-            if (this.canceled) {
-                return;
-            }
-    
-            if (this.cancelHandle) {
-                clearTimeout(this.cancelHandle);
-                this.cancelHandle = null;
-            }
-    
-            this.cancelHandle = setTimeout(function () {
-                _this.cancel();
-            }, ms);
-        };
-        CancellationData.MAX_HANDLE = 2147483647;
-    
-        CancellationData.nextHandle = 1;
-        return CancellationData;
-    })();
+    symbols.brand("AggregateError")(AggregateError);
     
     var CancellationToken = (function () {
         function CancellationToken() {
@@ -182,7 +71,7 @@
         }
         Object.defineProperty(CancellationToken.prototype, "canceled", {
             get: function () {
-                var data = __CancellationTokenData__.get(this);
+                var data = CancellationDataSym.get(this);
                 if (!data || !symbols.hasBrand(this, CancellationToken))
                     throw new TypeError("'this' is not a CancellationToken object");
     
@@ -193,25 +82,25 @@
         });
     
         CancellationToken.prototype.register = function (cleanup) {
-            var data = __CancellationTokenData__.get(this);
+            var data = CancellationDataSym.get(this);
             if (!data || !symbols.hasBrand(this, CancellationToken))
                 throw new TypeError("'this' is not a CancellationToken object");
     
-            return data.register(cleanup);
+            return RegisterCancellationCleanup(data, cleanup);
         };
     
         CancellationToken.prototype.unregister = function (handle) {
-            var data = __CancellationTokenData__.get(this);
+            var data = CancellationDataSym.get(this);
             if (!data || !symbols.hasBrand(this, CancellationToken))
                 throw new TypeError("'this' is not a CancellationToken object");
     
-            data.unregister(handle);
+            UnregisterCancellationCleanup(data, handle);
         };
         return CancellationToken;
     })();
     exports.CancellationToken = CancellationToken;
     
-    symbols.brand.set(CancellationToken.prototype, "CancellationToken");
+    symbols.brand("CancellationToken")(CancellationToken);
     
     var CancellationSource = (function () {
         function CancellationSource() {
@@ -221,12 +110,12 @@
             }
             var token = Object.create(CancellationToken.prototype);
             var data = new CancellationData(this, token);
-            __CancellationTokenData__.set(token, data);
-            __CancellationSourceData__.set(this, data);
+            CancellationDataSym.set(token, data);
+            CancellationDataSym.set(this, data);
     
             tokens.forEach(function (token) {
                 if (symbols.hasBrand(token, CancellationToken)) {
-                    data.linkTo(token);
+                    LinkToCancellationToken(data, token);
                 }
             });
     
@@ -234,7 +123,7 @@
         }
         Object.defineProperty(CancellationSource.prototype, "token", {
             get: function () {
-                var data = __CancellationSourceData__.get(this);
+                var data = CancellationDataSym.get(this);
                 if (!data || !symbols.hasBrand(this, CancellationSource))
                     throw new TypeError("'this' is not a CancellationSource object");
     
@@ -245,27 +134,27 @@
         });
     
         CancellationSource.prototype.cancel = function () {
-            var data = __CancellationSourceData__.get(this);
+            var data = CancellationDataSym.get(this);
             if (!data || !symbols.hasBrand(this, CancellationSource))
                 throw new TypeError("'this' is not a CancellationSource object");
             if (data.closed)
                 throw new Error("Object doesn't support this action");
     
-            data.cancel();
+            Cancel(data);
         };
     
         CancellationSource.prototype.cancelAfter = function (ms) {
-            var data = __CancellationSourceData__.get(this);
+            var data = CancellationDataSym.get(this);
             if (!data || !symbols.hasBrand(this, CancellationSource))
                 throw new TypeError("'this' is not a CancellationSource object");
             if (data.closed)
                 throw new Error("Object doesn't support this action");
     
-            data.cancelAfter(ms);
+            CancelAfter(data, ms);
         };
     
         CancellationSource.prototype.close = function () {
-            var data = __CancellationSourceData__.get(this);
+            var data = CancellationDataSym.get(this);
             if (!data || !symbols.hasBrand(this, CancellationSource))
                 throw new TypeError("'this' is not a CancellationSource object");
             if (data.closed)
@@ -274,8 +163,8 @@
             data.closed = true;
     
             if (data.links != null) {
-                data.links.forEach(function (node) {
-                    node.value.call(null);
+                data.links.forEach(function (value) {
+                    value.callback.call(null);
                 });
             }
     
@@ -285,209 +174,113 @@
     })();
     exports.CancellationSource = CancellationSource;
     
-    symbols.brand.set(CancellationSource.prototype, "CancellationSource");
+    symbols.brand("CancellationSource")(CancellationSource);
     
-    var _getDomain = function () {
-        return null;
-    };
-    var _setImmediate;
-    var _clearImmediate;
-    if (typeof setImmediate === "function") {
-        _setImmediate = function (task) {
-            return setImmediate(task);
-        };
-        _clearImmediate = function (handle) {
-            return clearImmediate(handle);
-        };
-    } else if (typeof process !== "undefined" && Object(process) === process && typeof process.nextTick === "function") {
-        _getDomain = function () {
-            return (process).domain;
-        };
-        _setImmediate = function (task) {
-            var handle = { canceled: false };
-            process.nextTick(function () {
-                if (!handle.canceled) {
-                    task();
-                }
-            });
-            return handle;
-        };
-        _clearImmediate = function (handle) {
-            if (handle)
-                handle.canceled = true;
-        };
-    } else {
-        _setImmediate = function (task) {
-            return setTimeout(task, 0);
-        };
-        _clearImmediate = function (handle) {
-            return clearTimeout(handle);
-        };
+    var CancellationData = (function () {
+        function CancellationData(source, token) {
+            this.closed = false;
+            this.canceled = false;
+            this.source = source;
+            this.token = token;
+        }
+        CancellationData.MAX_HANDLE = 2147483647;
+    
+        CancellationData.nextHandle = 1;
+        return CancellationData;
+    })();
+    
+    function RegisterCancellationCleanup(data, cleanup) {
+        if (data.canceled) {
+            cleanup();
+            return 0;
+        }
+    
+        if (CancellationData.nextHandle >= CancellationData.MAX_HANDLE) {
+            CancellationData.nextHandle = 1;
+        }
+    
+        var handle = CancellationData.nextHandle++;
+    
+        if (data.cleanupCallbacks == null) {
+            data.cleanupCallbacks = new lists.LinkedList();
+        }
+    
+        data.cleanupCallbacks.push({ handle: handle, callback: cleanup });
+        return handle;
     }
     
-    var DispatcherData = (function () {
-        function DispatcherData(dispatcher) {
-            this.inTick = false;
-            this.dispatcher = dispatcher;
+    function UnregisterCancellationCleanup(data, handle) {
+        if (data.cleanupCallbacks) {
+            var found = data.cleanupCallbacks.match(function (entry) {
+                return lists.is(entry.handle, handle);
+            });
+            if (found) {
+                data.cleanupCallbacks.deleteNode(found);
+            }
         }
-        DispatcherData.prototype.post = function (task, options, token) {
-            var _this = this;
-            var tokenHandle;
-            var taskHandle;
+    }
     
-            task = this.bind(task);
+    function LinkToCancellationToken(data, token) {
+        if (data.links == null) {
+            data.links = new lists.LinkedList();
+        }
     
-            if (options) {
-                if (options.synchronous) {
-                    if (!(token && token.canceled)) {
-                        try  {
-                            task();
-                        } catch (e) {
-                            this.post(function () {
-                                throw e;
-                            }, null, null);
-                        }
-                    }
+        var handle = token.register(function () {
+            Cancel(data);
+        });
     
-                    return;
-                } else if ("delay" in options) {
-                    taskHandle = setTimeout(function () {
-                        if (token) {
-                            if (tokenHandle) {
-                                token.unregister(tokenHandle);
-                            }
-                        }
+        data.links.push({ handle: handle, callback: function () {
+                UnregisterCancellationCleanup(data, handle);
+            } });
+    }
     
-                        task();
-                    }, options.delay);
+    function Cancel(data) {
+        if (data.canceled) {
+            return;
+        }
     
-                    if (token) {
-                        tokenHandle = token.register(function () {
-                            clearTimeout(taskHandle);
-                        });
-                    }
+        data.canceled = true;
     
-                    return;
-                } else if (options.fair) {
-                    taskHandle = _setImmediate(function () {
-                        if (token) {
-                            if (tokenHandle) {
-                                token.unregister(tokenHandle);
-                            }
-                        }
-    
-                        task();
-                    });
-    
-                    if (token) {
-                        tokenHandle = token.register(function () {
-                            _clearImmediate(taskHandle);
-                        });
-                    }
-                    return;
-                }
-            }
-    
-            if (this.tasks == null) {
-                this.tasks = new lists.LinkedList();
-            }
-    
-            var node = {
-                value: function () {
-                    if (token) {
-                        token.unregister(tokenHandle);
-                        if (token.canceled) {
-                            return;
-                        }
-                    }
-    
-                    task();
-                }
-            };
-    
-            this.tasks.insertAfter(this.tasks.tail, node);
-    
-            this.requestTick();
-    
-            if (token) {
-                tokenHandle = token.register(function () {
-                    _this.tasks.remove(node);
-    
-                    if (!_this.tasks.head) {
-                        _this.cancelTick();
-                    }
-                });
-            }
-        };
-    
-        DispatcherData.prototype.requestTick = function () {
-            var _this = this;
-            if (!this.inTick) {
-                if (!this.tickHandle && this.tasks.head) {
-                    this.tickHandle = _setImmediate(function () {
-                        _this.tick();
-                    });
-                }
-            }
-        };
-    
-        DispatcherData.prototype.cancelTick = function () {
-            if (this.tickHandle) {
-                _clearImmediate(this.tickHandle);
-                this.tickHandle = null;
-            }
-        };
-    
-        DispatcherData.prototype.bind = function (task) {
-            var _this = this;
-            var wrapped = function () {
-                var previousDispatcher = DispatcherData.current;
-                DispatcherData.current = _this.dispatcher;
-                try  {
-                    task();
-                } finally {
-                    DispatcherData.current = previousDispatcher;
-                }
-            };
-    
-            var domain = _getDomain();
-            if (domain) {
-                wrapped = domain.bind(wrapped);
-            }
-    
-            return wrapped;
-        };
-    
-        DispatcherData.prototype.tick = function () {
-            this.cancelTick();
-    
-            this.requestTick();
-    
-            this.inTick = true;
+        var errors;
+        var callback = function (value) {
             try  {
-                while (this.tasks.head) {
-                    var next = this.tasks.head;
-                    this.tasks.remove(next);
-    
-                    var callback = next.value;
-                    callback();
+                value.callback.call(null);
+            } catch (e) {
+                if (errors == null) {
+                    errors = [];
                 }
     
-                this.cancelTick();
-            } finally {
-                this.inTick = false;
+                errors.push(e);
             }
         };
-        DispatcherData.default = null;
     
-        DispatcherData.current = null;
-        return DispatcherData;
-    })();
+        data.cleanupCallbacks.forEach(callback);
+        data.cleanupCallbacks = null;
+    
+        if (errors) {
+            throw new AggregateError(null, errors);
+        }
+    }
+    
+    function CancelAfter(data, ms) {
+        if (data.canceled) {
+            return;
+        }
+    
+        if (data.cancelHandle) {
+            clearTimeout(data.cancelHandle);
+            data.cancelHandle = null;
+        }
+    
+        data.cancelHandle = setTimeout(function () {
+            Cancel(data);
+        }, ms);
+    }
     
     var Dispatcher = (function () {
         function Dispatcher() {
             var data = new DispatcherData(this);
-            __DispatcherData__.set(this, data);
+            DispatcherDataSym.set(this, data);
         }
         Object.defineProperty(Dispatcher, "default", {
             get: function () {
@@ -519,7 +312,7 @@
             for (var _i = 0; _i < (arguments.length - 1); _i++) {
                 args[_i] = arguments[_i + 1];
             }
-            var data = __DispatcherData__.get(this);
+            var data = DispatcherDataSym.get(this);
             if (!data || !symbols.hasBrand(this, Dispatcher))
                 throw new TypeError("'this' is not a Dispatcher object");
     
@@ -535,11 +328,203 @@
                 options = args[argi];
             }
     
-            data.post(task, options, token);
+            PostTask(data, task, options, token);
         };
         return Dispatcher;
     })();
     exports.Dispatcher = Dispatcher;
     
-    symbols.brand.set(Dispatcher.prototype, "Dispatcher");
+    symbols.brand("Dispatcher")(Dispatcher);
+    
+    var DispatcherData = (function () {
+        function DispatcherData(dispatcher) {
+            this.inTick = false;
+            this.dispatcher = dispatcher;
+        }
+        DispatcherData.default = null;
+    
+        DispatcherData.current = null;
+        return DispatcherData;
+    })();
+    
+    function PostTask(data, task, options, token) {
+        var tokenHandle;
+        var taskHandle;
+    
+        task = BindTask(data, task);
+    
+        if (options) {
+            if (options.synchronous) {
+                if (!(token && token.canceled)) {
+                    try  {
+                        task();
+                    } catch (e) {
+                        PostTask(data, function () {
+                            throw e;
+                        }, null, null);
+                    }
+                }
+    
+                return;
+            } else if ("delay" in options) {
+                taskHandle = setTimeout(function () {
+                    if (token) {
+                        if (tokenHandle) {
+                            token.unregister(tokenHandle);
+                        }
+                    }
+    
+                    task();
+                }, options.delay);
+    
+                if (token) {
+                    tokenHandle = token.register(function () {
+                        clearTimeout(taskHandle);
+                    });
+                }
+    
+                return;
+            } else if (options.fair) {
+                taskHandle = SetImmediate(function () {
+                    if (token) {
+                        if (tokenHandle) {
+                            token.unregister(tokenHandle);
+                        }
+                    }
+    
+                    task();
+                });
+    
+                if (token) {
+                    tokenHandle = token.register(function () {
+                        ClearImmediate(taskHandle);
+                    });
+                }
+                return;
+            }
+        }
+    
+        if (data.tasks == null) {
+            data.tasks = new lists.LinkedList();
+        }
+    
+        var node = data.tasks.push(function () {
+            if (token) {
+                token.unregister(tokenHandle);
+                if (token.canceled) {
+                    return;
+                }
+            }
+    
+            task();
+        });
+    
+        RequestTick(data);
+    
+        if (token) {
+            tokenHandle = token.register(function () {
+                data.tasks.deleteNode(node);
+    
+                if (!data.tasks.head) {
+                    CancelTick(data);
+                }
+            });
+        }
+    }
+    
+    function BindTask(data, task) {
+        var wrapped = function () {
+            var previousDispatcher = DispatcherData.current;
+            DispatcherData.current = data.dispatcher;
+            try  {
+                task();
+            } finally {
+                DispatcherData.current = previousDispatcher;
+            }
+        };
+    
+        var domain = GetDomain();
+        if (domain) {
+            wrapped = domain.bind(wrapped);
+        }
+    
+        return wrapped;
+    }
+    
+    function RequestTick(data) {
+        if (!data.inTick) {
+            if (!data.tickHandle && data.tasks.head) {
+                data.tickHandle = SetImmediate(function () {
+                    Tick(data);
+                });
+            }
+        }
+    }
+    
+    function CancelTick(data) {
+        if (data.tickHandle) {
+            ClearImmediate(data.tickHandle);
+            data.tickHandle = null;
+        }
+    }
+    
+    function Tick(data) {
+        CancelTick(data);
+    
+        RequestTick(data);
+    
+        data.inTick = true;
+        try  {
+            while (data.tasks.head) {
+                var next = data.tasks.head;
+                data.tasks.deleteNode(next);
+    
+                var callback = next.value;
+                callback();
+            }
+    
+            CancelTick(data);
+        } finally {
+            data.inTick = false;
+        }
+    }
+    
+    var GetDomain = function () {
+        return null;
+    };
+    var SetImmediate;
+    var ClearImmediate;
+    
+    if (typeof setImmediate === "function") {
+        SetImmediate = function (task) {
+            return setImmediate(task);
+        };
+        ClearImmediate = function (handle) {
+            return clearImmediate(handle);
+        };
+    } else if (typeof process !== "undefined" && Object(process) === process && typeof process.nextTick === "function") {
+        GetDomain = function () {
+            return (process).domain;
+        };
+        SetImmediate = function (task) {
+            var handle = { canceled: false };
+            process.nextTick(function () {
+                if (!handle.canceled) {
+                    task();
+                }
+            });
+            return handle;
+        };
+        ClearImmediate = function (handle) {
+            if (handle)
+                handle.canceled = true;
+        };
+    } else {
+        SetImmediate = function (task) {
+            return setTimeout(task, 0);
+        };
+        ClearImmediate = function (handle) {
+            return clearTimeout(handle);
+        };
+    }
 }, this);

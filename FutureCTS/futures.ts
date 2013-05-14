@@ -10,30 +10,19 @@ import symbols = module('symbols');
 import lists = module('lists');
 import tasks = module('tasks');
 
-// pseudo-private symbols for private data
-var __FutureResolverData__ = new symbols.Symbol("FutureResolverData@fe75fb24-6707-43b7-9b5d-7dc9fce1d77a");
-var __FutureData__ = new symbols.Symbol("FutureData@da3786b6-9afc-4502-937e-f9d7ceda05ff");
+var FutureDataSym = new symbols.Symbol("futures.FutureData");
 
-/** 
- * Links two cancellation tokens
- * @param x The first cancellation token
- * @param y The second cancellation token
- * @returns A token that is canceled when either x or y ara cancelled, or null if neither argument was a token
- */
-function linkTokens(x: tasks.CancellationToken, y: tasks.CancellationToken): tasks.CancellationToken {
-    if (x) {
-        if (y) {
-            return new tasks.CancellationSource(x, y).token;
-        }
-        return x;
-    }
-    return y;
-}
+interface ContinuationEntry {
+    /** 
+     * The token used for cancellation
+     */
+    token: tasks.CancellationToken;
 
-interface ContinuationLinkedListNode extends lists.LinkedListNode<(value: any) => void> {
-    /** The token used for cancellation
-      */
-    token?: tasks.CancellationToken;
+    /**
+     * The callback for the continuation
+     * @type {Function}
+     */
+    callback: (value: any) => void;
 }
 
 /** 
@@ -62,287 +51,19 @@ enum FutureState {
 }
 
 /** 
- * Internal data for a Future and its Resolver
+ * Links two cancellation tokens
+ * @param x The first cancellation token
+ * @param y The second cancellation token
+ * @returns A token that is canceled when either x or y ara cancelled, or null if neither argument was a token
  */
-class FutureData<T> {
-
-    /**
-     * A value indicating whether the future has resolved
-     * @type {Boolean}
-     */
-    public resolved: bool = false;
-
-    /**
-     * The associated future
-     * @type {Future}
-     */
-    public future: Future<T>;
-
-    /**
-     * The associated resolver
-     * @type {FutureResolver}
-     */
-    public resolver: FutureResolver<T>;
-
-    /**
-     * The current state of the future
-     * @type {FutureState}
-     */
-    public state: FutureState = FutureState.pending;
-
-    /**
-     * The result of the future
-     * @type {any}
-     */
-    public result: any;
-
-    /**
-     * A linked list of resolve callbacks
-     * @type {lists.LinkedList}
-     */
-    public resolveCallbacks: lists.LinkedList<(value: any) => void>;
-
-    /**
-     * A linked list of reject callbacks
-     * @type {lists.LinkedList}
-     */
-    public rejectCallbacks: lists.LinkedList<(value: any) => void>;
-
-    /**
-     * A cancellation token used to cancel the future
-     * @type {tasks.CancellationToken}
-     */
-    public token: tasks.CancellationToken;
-
-    /**
-     * A handle used to register with the cancellation token
-     * @type {Number}
-     */
-    public cancellationHandle: number;
-    
-    /** 
-     * Internal data for a Future and its Resolver
-     * @constructor
-     * @param future The Future associated with this data
-     * @param resolver The resolver associated with this data
-     * @param token The cancellation token used to manage cancellation
-     */
-    constructor(future: Future, resolver: FutureResolver, token: tasks.CancellationToken) {
-        this.future = future;
-        this.resolver = resolver;
-        this.token = token;
-
-        // register for cancellation
-        if (this.token) {
-            this.cancellationHandle = this.token.register(() => { this.cancel() });
+function LinkTokens(x: tasks.CancellationToken, y: tasks.CancellationToken): tasks.CancellationToken {
+    if (x) {
+        if (y) {
+            return new tasks.CancellationSource(x, y).token;
         }
+        return x;
     }
-    
-    /** 
-     * Accept algorithm, accepts a value as the future result
-     * @param value The value for the result of the future
-     * @param synchronous A flag that specifies whether to execute callbacks synchronously or asynchronously
-     *
-     * @link http://dom.spec.whatwg.org/#concept-resolver-accept
-     */
-    public accept(value: any, synchronous?: bool) : void {
-        if (this.resolved) {
-            return;
-        }
-        
-        this.state = FutureState.accepted;
-        this.result = value;
-        this.resolved = true;
-        
-        if (this.token && this.cancellationHandle) {
-            this.token.unregister(this.cancellationHandle);
-            this.token = null;
-            this.cancellationHandle = null;
-        }
-        
-        this.process(this.resolveCallbacks, value, synchronous);
-    }
-    
-    /** 
-     * Resolve algorithm, resolves a value that may be a future
-     * @param value The value for the result of the future
-     * @param synchronous A flag that specifies whether to execute callbacks synchronously or asynchronously
-     *
-     * @link http://dom.spec.whatwg.org/#concept-resolver-resolve (modified)
-     * 
-     * The spec for DOM Futures performs a recursive unwrap and assimilation. Based on conversations on 
-     * es-discuss this has been changed to a single unwrap with no assimilation. Recursive unwrap and assimilation
-     * can be performed using the Future.from() method.
-     */
-    public resolve(value: any, synchronous?: bool): void {
-        if (this.resolved) {
-            return;
-        }
-
-        if (value === this.future) {
-            throw new TypeError("Future cannot be resolved with itself")
-        }
-        
-        if (Future.isFuture(value)) {
-            var resolve = value => this.accept(value, true);
-            var reject = value => this.reject(value, true);
-            
-            try {
-                value.done(resolve, reject, this.token);
-            }
-            catch (e) {
-                this.reject(e, synchronous);
-            }
-            
-            return;
-        }
-        
-        this.accept(value, synchronous);
-    }
-
-    /** 
-     * Reject algorithm
-     * @param value The value for the result of the future
-     * @param synchronous A flag that specifies whether to execute callbacks synchronously or asynchronously
-     *
-     * @link http://dom.spec.whatwg.org/#concept-resolver-reject
-     */
-    public reject(value: any, synchronous?: bool) {
-        if (this.resolved) { 
-            return;
-        }
-        
-        this.state = FutureState.rejected;
-        this.result = value;
-        this.resolved = true;
-
-        if (this.token && this.cancellationHandle) {
-            this.token.unregister(this.cancellationHandle);
-            this.token = null;
-            this.cancellationHandle = null;
-        }
-        
-        this.process(this.rejectCallbacks, value, synchronous);
-    }
-    
-    /** 
-     * Performs cancellation of the future
-     */
-    public cancel() {
-        if (this.resolved) {
-            return;
-        }
-        
-        this.state = FutureState.canceled;
-        this.resolved = true;
-        
-        if (this.token && this.cancellationHandle) {
-            this.token.unregister(this.cancellationHandle);
-            this.token = null;
-            this.cancellationHandle = null;
-        }
-    }
-
-    /** 
-     * Appends a resolve or reject callback to the future's internal resolveCallbacks or rejectCallbacks lists.
-     * @param resolveCallback The callback to execute upon resolution
-     * @param rejectCallback The callback to execute upon rejection
-     * @param token The cancellation token for the callbacks
-     * 
-     * @link http://dom.spec.whatwg.org/#concept-future-append
-     */
-    public append(resolveCallback: (value: any) => void, rejectCallback: (value: any) => void, token: tasks.CancellationToken): void {
-
-        // possibly create a linked token for the callbacks
-        if (!(token && token.canceled)) {
-            
-            if (typeof resolveCallback === "function") {
-                if (this.resolveCallbacks == null) {
-                    this.resolveCallbacks = new lists.LinkedList<(value: any) => void>();
-                }
-
-                var resolveNode: ContinuationLinkedListNode = {
-                    token: token,
-                    value: resolveCallback
-                };
-
-                this.resolveCallbacks.insertAfter(this.resolveCallbacks.tail, resolveNode);
-
-                if (token) {
-                    token.register(() => this.resolveCallbacks.remove(resolveNode));
-                }
-            }
-            
-            if (typeof rejectCallback === "function") {
-                if (this.rejectCallbacks == null) {
-                    this.rejectCallbacks = new lists.LinkedList<() => void>(); 
-                }
-
-                var rejectNode: ContinuationLinkedListNode = {
-                    token: token,
-                    value: rejectCallback
-                };
-                
-                this.rejectCallbacks.insertAfter(this.rejectCallbacks.tail, rejectNode);
-
-                if (token) {
-                    token.register(() => this.rejectCallbacks.remove(rejectNode));
-                }
-            }
-            
-            if (this.state === FutureState.accepted) {
-                // the future has already been accepted, process the resolve callbacks in a later turn
-                this.process(this.resolveCallbacks, this.result, false);
-            }
-            else if (this.state === FutureState.rejected) {
-                // the future has already been rejected, process the reject callbacks in a later turn
-                this.process(this.rejectCallbacks, this.result, false);
-            }
-        }
-    }    
-     
-    /** 
-     * Future wrapper callback algorithm
-     * @link http://dom.spec.whatwg.org/#concept-future-wrapper-callback
-     */
-    public wrapCallback(callback: (value: any) => any): (value: any) => void {
-        var wrapper = (value: any) => {
-            try {
-                value = callback.call(this.future, value);
-            }
-            catch (e) {
-                this.reject(e, true);
-                return;
-            }
-            
-            this.resolve(value, true); 
-        }
-
-        return wrapper;
-    }
-
-    /** 
-     * Processes callbacks
-     * @param callbacks The callbacks to process
-     * @param result The result to pass to the callbacks
-     * @param token The cancellation token used to manage cancellation of the task
-     * @param synchronous A value indicating whether to process the callbacks synchronously
-     *
-     * @link http://dom.spec.whatwg.org/#concept-future-process (modified)
-     */
-    public process(callbacks: lists.LinkedList<(value: any) => void>, result: any, synchronous: bool): void {
-        if (callbacks) {
-            while (callbacks.head) {
-                var next: ContinuationLinkedListNode = callbacks.head;
-                callbacks.remove(next);
-                var callback = next.value, token = next.token;
-                if (!(token && token.canceled)) {
-                    // execute either synchronously or as a microtask at the end of the turn
-                    tasks.Dispatcher.current.post(((callback) => () => { callback(result); })(callback), { synchronous: synchronous }, token);
-                }
-            }
-        }
-    }
+    return y;
 }
 
 /** 
@@ -368,7 +89,7 @@ export class FutureResolver<T> {
      * @link http://dom.spec.whatwg.org/#dom-futureresolver-accept
      */
     public accept(value: T): void {
-        var data: FutureData<T> = __FutureResolverData__.get(this);
+        var data: FutureData<T> = FutureDataSym.get(this);
         if (!data || !symbols.hasBrand(this, FutureResolver)) throw new TypeError("'this' is not a FutureResolver object");
         
         data.accept(value);
@@ -397,7 +118,7 @@ export class FutureResolver<T> {
      * @link http://dom.spec.whatwg.org/#dom-futureresolver-resolve
      */
     public resolve(value: any): void {
-        var data: FutureData = __FutureResolverData__.get(this);
+        var data: FutureData = FutureDataSym.get(this);
         if (!data || !symbols.hasBrand(this, FutureResolver)) throw new TypeError("'this' is not a FutureResolver object");
         
         data.resolve(value);
@@ -409,7 +130,7 @@ export class FutureResolver<T> {
       * @link http://dom.spec.whatwg.org/#dom-futureresolver-reject
       */
     public reject(value: any): void {
-        var data: FutureData<T> = __FutureResolverData__.get(this);
+        var data: FutureData<T> = FutureDataSym.get(this);
         if (!data || !symbols.hasBrand(this, FutureResolver)) throw new TypeError("'this' is not a FutureResolver object");
         
         data.reject(value);
@@ -417,7 +138,7 @@ export class FutureResolver<T> {
 }
 
 // brand the FutureResolver class
-symbols.brand.set(FutureResolver.prototype, "FutureResolver");
+symbols.brand("FutureResolver")(FutureResolver);
 
 /** 
  * A Future value
@@ -451,10 +172,10 @@ export class Future<T> {
         if (token != null && !symbols.hasBrand(token, tasks.CancellationToken)) throw new TypeError("Invalid argument: token");
         
         // create resolver object from its prototype
-        var resolver : FutureResolver<T> = Object.create(FutureResolver.prototype);
+        var resolver: FutureResolver<T> = Object.create(FutureResolver.prototype);
         var data = new FutureData<T>(this, resolver, token);
-        __FutureResolverData__.set(resolver, data);
-        __FutureData__.set(this, data);
+        FutureDataSym.set(resolver, data);
+        FutureDataSym.set(this, data);
                 
         // convenience, bind the methods to the instance
         resolver.accept = resolver.accept.bind(resolver);
@@ -560,8 +281,8 @@ export class Future<T> {
      *
      * @link http://dom.spec.whatwg.org/#dom-future-reject
      */
-    public static reject<TResult>(value: any): Future<TResult> {
-        return new Future<TResult>(resolver => { 
+    public static reject(value: any): Future {
+        return new Future(resolver => { 
             resolver.reject(value);
         });
     }
@@ -593,7 +314,7 @@ export class Future<T> {
      */
     public static any(...values: any[]): Future {
         return new Future(resolver => {
-            var data: FutureData = __FutureResolverData__.get(resolver);
+            var data: FutureData = FutureDataSym.get(resolver);
             if (!data || !symbols.hasBrand(resolver, FutureResolver)) throw new TypeError("'this' is not a FutureResolver object");
 
             var resolveCallback = value => data.accept(value, true);
@@ -645,7 +366,7 @@ export class Future<T> {
      */
     public static every(...values: any[]): Future {
         return new Future(resolver => {
-            var data: FutureData = __FutureResolverData__.get(resolver);
+            var data: FutureData = FutureDataSym.get(resolver);
             if (!data || !symbols.hasBrand(resolver, FutureResolver)) throw new TypeError("'this' is not a FutureResolver object");
 
             var countdown = values.length;
@@ -699,7 +420,7 @@ export class Future<T> {
      */
     public static some(...values: any[]): Future {
         return new Future(resolver => {
-            var data: FutureData = __FutureResolverData__.get(resolver);
+            var data: FutureData = FutureDataSym.get(resolver);
             if (!data || !symbols.hasBrand(resolver, FutureResolver)) throw new TypeError("'this' is not a FutureResolver object");
 
             var countdown = values.length;
@@ -1051,7 +772,7 @@ export class Future<T> {
         }
 
         return new Future(resolver => {
-            var data = __FutureResolverData__.get(resolver);
+            var data = FutureDataSym.get(resolver);
             if (!data || !symbols.hasBrand(resolver, FutureResolver)) throw new TypeError("'this' is not a FutureResolver object");
 
             tasks.Dispatcher.current.post(() => {
@@ -1197,7 +918,7 @@ export class Future<T> {
      * @link http://dom.spec.whatwg.org/#dom-future-then (modified)
      */
     public then<TResult>(...args: any[]): Future<TResult> {
-        var data: FutureData<T> = __FutureData__.get(this);
+        var data: FutureData<T> = FutureDataSym.get(this);
         if (!data || !symbols.hasBrand(this, Future)) throw new TypeError("'this' is not a Future object");
 
         var argi: number = 0;
@@ -1216,10 +937,10 @@ export class Future<T> {
         }
 
         // create a linked token
-        token = linkTokens(data.token, token);
+        token = LinkTokens(data.token, token);
 
         return new Future<TResult>(resolver => {
-            var resolverData: FutureData<TResult> = __FutureResolverData__.get(resolver);
+            var resolverData: FutureData<TResult> = FutureDataSym.get(resolver);
             if (!resolverData || !symbols.hasBrand(resolver, FutureResolver)) throw new TypeError("'this' is not a FutureResolver object");
 
             var resolveCallback: (value: T) => void;
@@ -1290,14 +1011,14 @@ export class Future<T> {
      * @link http://dom.spec.whatwg.org/#dom-future-catch
      */
     public catch<TResult>(reject: (value: any) => any, token?: tasks.CancellationToken): Future<TResult> {
-        var data: FutureData<T> = __FutureData__.get(this);
+        var data: FutureData<T> = FutureDataSym.get(this);
         if (!data || !symbols.hasBrand(this, Future)) throw new TypeError("'this' is not a Future object");
 
         // create a linked token
-        token = linkTokens(data.token, token);
+        token = LinkTokens(data.token, token);
         
         return new Future(resolver => {
-            var resolverData: FutureData<TResult> = __FutureResolverData__.get(resolver);
+            var resolverData: FutureData<TResult> = FutureDataSym.get(resolver);
             if (!resolverData || !symbols.hasBrand(resolver, FutureResolver)) throw new TypeError("'this' is not a FutureResolver object");
 
             var resolveCallback = (value: T): void => { resolverData.accept(value, true); };
@@ -1370,8 +1091,8 @@ export class Future<T> {
      * @link http://dom.spec.whatwg.org/#dom-future-catch
      */
     public done(...args: any[]): void {
-        var data: FutureData<T> = __FutureData__.get(this);
-        if (!data) throw new TypeError("'this' is not a Future object");
+        var data: FutureData<T> = FutureDataSym.get(this);
+        if (!data || !symbols.hasBrand(this, Future)) throw new TypeError("'this' is not a Future object");
 
         var argi: number = 0;
         var resolve: (value: T) => void = null;
@@ -1384,12 +1105,13 @@ export class Future<T> {
                 reject = args[argi++];
             }
         }
+        
         if (symbols.hasBrand(args[argi], tasks.CancellationToken)) {
             token = args[argi];
         }
 
         // create a linked token
-        token = linkTokens(data.token, token);
+        token = LinkTokens(data.token, token);
 
         if (reject == null) {
             reject = e => { throw e; };
@@ -1400,7 +1122,287 @@ export class Future<T> {
 }
 
 // brand the Future class
-symbols.brand.set(Future.prototype, "Future");
+symbols.brand("Future")(Future);
+
+/** 
+ * Internal data for a Future and its Resolver
+ */
+class FutureData<T> {
+
+    /**
+     * A value indicating whether the future has resolved
+     * @type {Boolean}
+     */
+    public resolved: bool = false;
+
+    /**
+     * The associated future
+     * @type {Future}
+     */
+    public future: Future<T>;
+
+    /**
+     * The associated resolver
+     * @type {FutureResolver}
+     */
+    public resolver: FutureResolver<T>;
+
+    /**
+     * The current state of the future
+     * @type {FutureState}
+     */
+    public state: FutureState = FutureState.pending;
+
+    /**
+     * The result of the future
+     * @type {any}
+     */
+    public result: any;
+
+    /**
+     * A linked list of resolve callbacks
+     * @type {lists.LinkedList}
+     */
+    public resolveCallbacks: lists.LinkedList<ContinuationEntry>;
+
+    /**
+     * A linked list of reject callbacks
+     * @type {lists.LinkedList}
+     */
+    public rejectCallbacks: lists.LinkedList<ContinuationEntry>;
+
+    /**
+     * A cancellation token used to cancel the future
+     * @type {tasks.CancellationToken}
+     */
+    public token: tasks.CancellationToken;
+
+    /**
+     * A handle used to register with the cancellation token
+     * @type {Number}
+     */
+    public cancellationHandle: number;
+    
+    /** 
+     * Internal data for a Future and its Resolver
+     * @constructor
+     * @param future The Future associated with this data
+     * @param resolver The resolver associated with this data
+     * @param token The cancellation token used to manage cancellation
+     */
+    constructor(future: Future, resolver: FutureResolver, token: tasks.CancellationToken) {
+        this.future = future;
+        this.resolver = resolver;
+        this.token = token;
+
+        // register for cancellation
+        if (this.token) {
+            this.cancellationHandle = this.token.register(() => { this.cancel() });
+        }
+    }
+    
+    /** 
+     * Accept algorithm, accepts a value as the future result
+     * @param value The value for the result of the future
+     * @param synchronous A flag that specifies whether to execute callbacks synchronously or asynchronously
+     *
+     * @link http://dom.spec.whatwg.org/#concept-resolver-accept
+     */
+    public accept(value: any, synchronous?: bool) : void {
+        if (this.resolved) {
+            return;
+        }
+        
+        this.state = FutureState.accepted;
+        this.result = value;
+        this.resolved = true;
+        
+        if (this.token && this.cancellationHandle) {
+            this.token.unregister(this.cancellationHandle);
+            this.token = null;
+            this.cancellationHandle = null;
+        }
+        
+        this.process(this.resolveCallbacks, value, synchronous);
+    }
+    
+    /** 
+     * Resolve algorithm, resolves a value that may be a future
+     * @param value The value for the result of the future
+     * @param synchronous A flag that specifies whether to execute callbacks synchronously or asynchronously
+     *
+     * @link http://dom.spec.whatwg.org/#concept-resolver-resolve (modified)
+     * 
+     * The spec for DOM Futures performs a recursive unwrap and assimilation. Based on conversations on 
+     * es-discuss this has been changed to a single unwrap with no assimilation. Recursive unwrap and assimilation
+     * can be performed using the Future.from() method.
+     */
+    public resolve(value: any, synchronous?: bool): void {
+        if (this.resolved) {
+            return;
+        }
+
+        if (value === this.future) {
+            throw new TypeError("Future cannot be resolved with itself")
+        }
+        
+        if (Future.isFuture(value)) {
+            var resolve = value => this.accept(value, true);
+            var reject = value => this.reject(value, true);
+            
+            try {
+                value.done(resolve, reject, this.token);
+            }
+            catch (e) {
+                this.reject(e, synchronous);
+            }
+            
+            return;
+        }
+        
+        this.accept(value, synchronous);
+    }
+
+    /** 
+     * Reject algorithm
+     * @param value The value for the result of the future
+     * @param synchronous A flag that specifies whether to execute callbacks synchronously or asynchronously
+     *
+     * @link http://dom.spec.whatwg.org/#concept-resolver-reject
+     */
+    public reject(value: any, synchronous?: bool) {
+        if (this.resolved) { 
+            return;
+        }
+        
+        this.state = FutureState.rejected;
+        this.result = value;
+        this.resolved = true;
+
+        if (this.token && this.cancellationHandle) {
+            this.token.unregister(this.cancellationHandle);
+            this.token = null;
+            this.cancellationHandle = null;
+        }
+        
+        this.process(this.rejectCallbacks, value, synchronous);
+    }
+    
+    /** 
+     * Performs cancellation of the future
+     */
+    public cancel() {
+        if (this.resolved) {
+            return;
+        }
+        
+        this.state = FutureState.canceled;
+        this.resolved = true;
+        
+        if (this.token && this.cancellationHandle) {
+            this.token.unregister(this.cancellationHandle);
+            this.token = null;
+            this.cancellationHandle = null;
+        }
+    }
+
+    /** 
+     * Appends a resolve or reject callback to the future's internal resolveCallbacks or rejectCallbacks lists.
+     * @param resolveCallback The callback to execute upon resolution
+     * @param rejectCallback The callback to execute upon rejection
+     * @param token The cancellation token for the callbacks
+     * 
+     * @link http://dom.spec.whatwg.org/#concept-future-append
+     */
+    public append(resolveCallback: (value: any) => void, rejectCallback: (value: any) => void, token: tasks.CancellationToken): void {
+
+        // possibly create a linked token for the callbacks
+        if (!(token && token.canceled)) {
+            
+            if (typeof resolveCallback === "function") {
+                if (this.resolveCallbacks == null) {
+                    this.resolveCallbacks = new lists.LinkedList<ContinuationEntry>();
+                }
+
+                var resolveNode = this.resolveCallbacks.push({
+                    token: token,
+                    callback: resolveCallback
+                });
+
+                if (token) {
+                    token.register(() => this.resolveCallbacks.deleteNode(resolveNode));
+                }
+            }
+            
+            if (typeof rejectCallback === "function") {
+                if (this.rejectCallbacks == null) {
+                    this.rejectCallbacks = new lists.LinkedList<ContinuationEntry>(); 
+                }
+
+                var rejectNode = this.rejectCallbacks.push({
+                    token: token,
+                    callback: rejectCallback
+                });
+
+                if (token) {
+                    token.register(() => this.rejectCallbacks.deleteNode(rejectNode));
+                }
+            }
+            
+            if (this.state === FutureState.accepted) {
+                // the future has already been accepted, process the resolve callbacks in a later turn
+                this.process(this.resolveCallbacks, this.result, false);
+            }
+            else if (this.state === FutureState.rejected) {
+                // the future has already been rejected, process the reject callbacks in a later turn
+                this.process(this.rejectCallbacks, this.result, false);
+            }
+        }
+    }    
+     
+    /** 
+     * Future wrapper callback algorithm
+     * @link http://dom.spec.whatwg.org/#concept-future-wrapper-callback
+     */
+    public wrapCallback(callback: (value: any) => any): (value: any) => void {
+        var wrapper = (value: any) => {
+            try {
+                value = callback.call(this.future, value);
+            }
+            catch (e) {
+                this.reject(e, true);
+                return;
+            }
+            
+            this.resolve(value, true); 
+        }
+
+        return wrapper;
+    }
+
+    /** 
+     * Processes callbacks
+     * @param callbacks The callbacks to process
+     * @param result The result to pass to the callbacks
+     * @param token The cancellation token used to manage cancellation of the task
+     * @param synchronous A value indicating whether to process the callbacks synchronously
+     *
+     * @link http://dom.spec.whatwg.org/#concept-future-process (modified)
+     */
+    public process(callbacks: lists.LinkedList<ContinuationEntry>, result: any, synchronous: bool): void {
+        if (callbacks) {
+            while (callbacks.head) {
+                var next = callbacks.head;
+                callbacks.deleteNode(next);
+                var callback = next.value.callback, token = next.value.token;
+                if (!(token && token.canceled)) {
+                    // execute either synchronously or as a microtask at the end of the turn
+                    tasks.Dispatcher.current.post(((callback) => () => { callback(result); })(callback), { synchronous: synchronous }, token);
+                }
+            }
+        }
+    }
+}
 
 // polyfill for Futures
 if (typeof window !== "undefined" && typeof (<any>window).Future === "undefined") {

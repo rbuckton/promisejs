@@ -42,18 +42,18 @@ file("FutureCTS/tasks.ts");
 file("FutureCTS/futures.ts");
 file("FutureCTS/tests.ts");
 file("FutureCTS/eventstream.ts")
-file("FutureCTS/httprequest.ts")
+file("FutureCTS/httpclient.ts")
 directory("obj/FutureCTS", ["obj"]);
 tsc("FutureCTS/symbols.js", ["obj/FutureCTS"], "FutureCTS/symbols.ts", { module: "umd", obj: "obj/FutureCTS", experimental: true });
 tsc("FutureCTS/lists.js", ["obj/FutureCTS"], "FutureCTS/lists.ts", { module: "umd", obj: "obj/FutureCTS", experimental: true });
 tsc("FutureCTS/tasks.js", ["obj/FutureCTS", "FutureCTS/symbols.js", "FutureCTS/lists.js"], "FutureCTS/tasks.ts", { module: "umd", obj: "obj/FutureCTS", experimental: true });
 tsc("FutureCTS/futures.js", ["obj/FutureCTS", "FutureCTS/symbols.js", "FutureCTS/lists.js", "FutureCTS/tasks.js"], "FutureCTS/futures.ts", { module: "umd", obj: "obj/FutureCTS", experimental: true });
 tsc("FutureCTS/eventstream.js", ["obj/FutureCTS", "FutureCTS/symbols.js", "FutureCTS/lists.js", "FutureCTS/tasks.js", "FutureCTS/futures.js"], "FutureCTS/eventstream.ts", { module: "umd", obj: "obj/FutureCTS", experimental: true });
-tsc("FutureCTS/httprequest.js", ["obj/FutureCTS", "FutureCTS/symbols.js", "FutureCTS/lists.js", "FutureCTS/tasks.js", "FutureCTS/futures.js", "FutureCTS/eventstream.js"], "FutureCTS/httprequest.ts", { module: "umd", obj: "obj/FutureCTS", experimental: true  });
-tsc("FutureCTS/tests.js", ["obj/FutureCTS", "FutureCTS/lists.js", "FutureCTS/tasks.js", "FutureCTS/futures.js", "FutureCTS/eventstream.js", "FutureCTS/httprequest.js"], "FutureCTS/tests.ts", { module: "umd", obj: "obj/FutureCTS", experimental: true });
-task("FutureCTS-build", ["FutureCTS/symbols.js", "FutureCTS/lists.js", "FutureCTS/tasks.js", "FutureCTS/futures.js" /*, "FutureCTS/eventstream.js", "FutureCTS/httprequest.js", "FutureCTS/tests.js" */]);
+tsc("FutureCTS/httpclient.js", ["obj/FutureCTS", "FutureCTS/symbols.js", "FutureCTS/lists.js", "FutureCTS/tasks.js", "FutureCTS/futures.js"], "FutureCTS/httpclient.ts", { module: "umd", obj: "obj/FutureCTS", experimental: true  });
+tsc("FutureCTS/tests.js", ["obj/FutureCTS", "FutureCTS/lists.js", "FutureCTS/tasks.js", "FutureCTS/futures.js", "FutureCTS/eventstream.js", "FutureCTS/httpclient.js"], "FutureCTS/tests.ts", { module: "umd", obj: "obj/FutureCTS", experimental: true });
+task("FutureCTS-build", ["FutureCTS/symbols.js", "FutureCTS/lists.js", "FutureCTS/tasks.js", "FutureCTS/futures.js" /*, "FutureCTS/eventstream.js" */, "FutureCTS/httpclient.js" /*, "FutureCTS/tests.js" */]);
 test("FutureCTS-test", ["FutureCTS-build"], "FutureCTS/tests.js");
-clean("FutureCTS-clean", [], ["FutureCTS/symbols.js", "FutureCTS/lists.js", "FututeCTS/tasks.js", "FutureCTS/futures.js", "FutureCTS/eventstream.js", "FutureCTS/httprequest.js", "FutureCTS/tests.js", "obj/FutureCTS"]);
+clean("FutureCTS-clean", [], ["FutureCTS/symbols.js", "FutureCTS/lists.js", "FututeCTS/tasks.js", "FutureCTS/futures.js", "FutureCTS/eventstream.js", "FutureCTS/httpclient.js", "FutureCTS/tests.js", "obj/FutureCTS"]);
 
 task("default", ["test"]);
 task("build", ["Future0-build", "Future1-build", "Future2-build", "FutureCTS-build"]);

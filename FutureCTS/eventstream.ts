@@ -381,7 +381,7 @@ export class EventSource {
 }
 
 // brand the EventSource class
-symbols.brand.set(EventSource.prototype, "EventSource");
+symbols.brand("EventSource")(EventSource);
 
 /** A stream of events
   */
@@ -635,7 +635,7 @@ export class EventStream {
     }
 }
 
-symbols.brand.set(EventStream.prototype, "EventStream");
+symbols.brand("EventStream")(EventStream);
 
 /*
     var _es5 = typeof Function.prototype.bind === "function" &&
