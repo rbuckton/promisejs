@@ -174,7 +174,7 @@ export class LinkedList<T> {
      * @param value {T} The value to remove from the list
      * @returns {Boolean} True if the value was in the list; otherwise, false.
      */
-    public delete(value: T): bool {
+    public delete(value: T): boolean {
         var node = this.match(v => is(v, value));
         if (node) {
             this.deleteNode(node);
@@ -189,7 +189,7 @@ export class LinkedList<T> {
      * @param value {T} The value to find
      * @returns {Boolean} True if the value was in the list; otherwise, false.
      */
-    public has(value: T): bool {
+    public has(value: T): boolean {
         return !!this.match(v => is(v, value));
     }
 
@@ -308,19 +308,19 @@ export class LinkedList<T> {
       * @param filter The filter to apply
       * @returns The node if found; otherwise, null
       */
-    public match(filter: (value: T) => bool): LinkedListNode<T>;
+    public match(filter: (value: T) => boolean): LinkedListNode<T>;
 
     /** Finds a node in the list
       * @param filter The filter to apply
       * @returns The node if found; otherwise, null
       */
-    public match(filter: (value: T, list: LinkedList<T>) => bool): LinkedListNode<T>;
+    public match(filter: (value: T, list: LinkedList<T>) => boolean): LinkedListNode<T>;
 
     /** Finds a node in the list
       * @param filter The filter to apply
       * @returns The node if found; otherwise, null
       */
-    public match(filter: (...args: any[]) => bool): LinkedListNode<T> {
+    public match(filter: (...args: any[]) => boolean): LinkedListNode<T> {
         var node = this.head;
         if (node) {
             while (!filter(node.value, this)) {
@@ -340,7 +340,7 @@ export class LinkedList<T> {
       * @param filter The filter to apply
       * @returns The node if found; otherwise, null
       */
-    public matchLast(filter: (value: T, list?: LinkedList<T>) => bool): LinkedListNode<T> {
+    public matchLast(filter: (value: T, list?: LinkedList<T>) => boolean): LinkedListNode<T> {
         var node = this.tail;
         if (node) {
             while (!filter(node.value, this)) {
@@ -423,7 +423,7 @@ export class Map<TKey, TValue> {
         }
     }
 
-    public has(key: TKey): bool {
+    public has(key: TKey): boolean {
         var mapData: MapData<TKey, TValue> = MapDataSym.get(this);
         if (!mapData || !symbols.hasBrand(this, Map)) throw new TypeError("'this' is not a Map object");
 
@@ -435,7 +435,7 @@ export class Map<TKey, TValue> {
         return false;
     }
 
-    public delete(key: TKey): bool {
+    public delete(key: TKey): boolean {
         var mapData: MapData<TKey, TValue> = MapDataSym.get(this);
         if (!mapData || !symbols.hasBrand(this, Map)) throw new TypeError("'this' is not a Map object");
 
@@ -487,7 +487,7 @@ export class Set<TValue> {
         return mapData.size;
     }
 
-    public add(key: TValue): bool {
+    public add(key: TValue): boolean {
         var mapData: MapData<TValue, void> = MapDataSym.get(this);
         if (!mapData || !symbols.hasBrand(this, Set)) throw new TypeError("'this' is not a Set object");
 
@@ -502,7 +502,7 @@ export class Set<TValue> {
         }
     }
 
-    public has(key: TValue): bool {
+    public has(key: TValue): boolean {
         var mapData: MapData<TValue, void> = MapDataSym.get(this);
         if (!mapData || !symbols.hasBrand(this, Set)) throw new TypeError("'this' is not a Set object");
 
@@ -514,7 +514,7 @@ export class Set<TValue> {
         return false;
     }
 
-    public delete(key: TValue): bool {
+    public delete(key: TValue): boolean {
         var mapData: MapData<TValue, void> = MapDataSym.get(this);
         if (!mapData || !symbols.hasBrand(this, Set)) throw new TypeError("'this' is not a Set object");
 
@@ -656,6 +656,6 @@ function ToKey(key: any): any {
  * @param x A value to test
  * @param y A value to test
  */
-export function is(x, y): bool {
+export function is(x, y): boolean {
     return (x === y) ? (x !== 0 || 1 / x === 1 / y) : (x !== x && y !== y);
 }

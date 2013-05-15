@@ -504,7 +504,7 @@ export class Future<T> {
      *
      * (not currently specified)
      */
-    public static isFuture(value: any): bool { 
+    public static isFuture(value: any): boolean { 
         return symbols.hasBrand(value, Future);
     }
 
@@ -1133,7 +1133,7 @@ class FutureData<T> {
      * A value indicating whether the future has resolved
      * @type {Boolean}
      */
-    public resolved: bool = false;
+    public resolved: boolean = false;
 
     /**
      * The associated future
@@ -1208,7 +1208,7 @@ class FutureData<T> {
      *
      * @link http://dom.spec.whatwg.org/#concept-resolver-accept
      */
-    public accept(value: any, synchronous?: bool) : void {
+    public accept(value: any, synchronous?: boolean) : void {
         if (this.resolved) {
             return;
         }
@@ -1237,7 +1237,7 @@ class FutureData<T> {
      * es-discuss this has been changed to a single unwrap with no assimilation. Recursive unwrap and assimilation
      * can be performed using the Future.from() method.
      */
-    public resolve(value: any, synchronous?: bool): void {
+    public resolve(value: any, synchronous?: boolean): void {
         if (this.resolved) {
             return;
         }
@@ -1270,7 +1270,7 @@ class FutureData<T> {
      *
      * @link http://dom.spec.whatwg.org/#concept-resolver-reject
      */
-    public reject(value: any, synchronous?: bool) {
+    public reject(value: any, synchronous?: boolean) {
         if (this.resolved) { 
             return;
         }
@@ -1389,7 +1389,7 @@ class FutureData<T> {
      *
      * @link http://dom.spec.whatwg.org/#concept-future-process (modified)
      */
-    public process(callbacks: lists.LinkedList<ContinuationEntry>, result: any, synchronous: bool): void {
+    public process(callbacks: lists.LinkedList<ContinuationEntry>, result: any, synchronous: boolean): void {
         if (callbacks) {
             while (callbacks.head) {
                 var next = callbacks.head;

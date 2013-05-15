@@ -92,7 +92,7 @@ export class CancellationToken {
      * Gets a value indicating whether the token has been canceled
      * @type {Boolean}
      */
-    public get canceled(): bool {
+    public get canceled(): boolean {
         var data = CancellationDataSym.get(this);
         if (!data || !symbols.hasBrand(this, CancellationToken)) throw new TypeError("'this' is not a CancellationToken object");
         
@@ -259,13 +259,13 @@ class CancellationData {
      * A value indicating whether the source has been closed
      * @type {Boolean}
      */
-    public closed: bool = false;
+    public closed: boolean = false;
 
     /**
      * A value indicating whether the source has been canceled
      * @type {Boolean}
      */
-    public canceled: bool = false;
+    public canceled: boolean = false;
     
     /**
      * A linked list of cleanup callbacks
@@ -415,12 +415,12 @@ export interface DispatcherPostOptions {
 	 * A value indicating whether the dispatcher should prefer fairness and schedule 
 	 * the task in a later turn rather than the end of the turn.
 	 */
-	fair?: bool;
+	fair?: boolean;
 
 	/**
 	 * A value indicating whether the dispatcher to execute the task synchronously. Exceptions will be raised to the engine's unhandled exception handler.
 	 */
-	synchronous?: bool;
+	synchronous?: boolean;
 
 	/**
 	 * A number of milliseconds to delay before the task should execute.
@@ -464,6 +464,17 @@ export class Dispatcher {
 
 		return DispatcherData.current;
 	}
+
+    /**
+     * Gets a value indicating whether the next tick will yield to the event loop
+     * @type {boolean}
+     */
+    public get nextTickWillYield(): boolean {
+        var data = DispatcherDataSym.get(this);
+        if (!data || !symbols.hasBrand(this, Dispatcher)) throw new TypeError("'this' is not a Dispatcher object");
+
+        return !data.inTick || Date.now() >= data.tickEnds;
+    }
 
     /** Posts a microtask to the dispatcher
       * @param task The task to schedule
@@ -535,6 +546,12 @@ class DispatcherData {
     public static current: Dispatcher = null;
 
     /**
+     * The maximum amount of time to spend executing local ticks before yielding to the event loop
+     * @type {number}
+     */
+    public static MAX_TICK_DURATION: number = 100;
+
+    /**
      * The related dispatcher for the internal data
      * @type {Dispatcher}
      */
@@ -556,7 +573,19 @@ class DispatcherData {
      * A value indicating whether the dispatcher is currently in a tick
      * @type {Boolean}
      */
-    public inTick: bool = false;
+    public inTick: boolean = false;
+
+    /**
+     * The time the tick started
+     * @type {number}
+     */
+    public tickStarted: number;
+
+    /**
+     * The time the tick must end
+     * @type {number}
+     */
+    public tickEnds: number;
 
     /**
      * Internal data and algorithms for a dispatcher
@@ -724,6 +753,8 @@ function Tick(data: DispatcherData) {
 
     // begin processing the queue
     data.inTick = true;
+    data.tickStarted = Date.now();    
+    data.tickEnds = data.tickStarted + DispatcherData.MAX_TICK_DURATION;    
     try {
 
         // Dequeue each pending task from the queue. If an exception is thrown, 
@@ -738,12 +769,29 @@ function Tick(data: DispatcherData) {
             // NOTE: this may throw, that's ok. If it throws, we can continue processing in a later tick (assuming we ever get to it, depending on the engine).
             var callback = next.value;
             callback();
+
+            // check to see if we should continue processing
+            if (Date.now() >= data.tickEnds) {
+
+                // maximum time in this tick has elapsed
+                if (data.tasks.head) {
+
+                    // more tasks to process, yield to the next tick
+                    return;
+                }
+                else {
+                    // no more tasks to process, exit the loop and cancel the next tick
+                    break;
+                }
+            }
         }
 
         // No exceptions thrown, and no new tasks added. cancel the requested tick
         CancelTick(data);
     }
     finally {
+        data.tickStarted = null;
+        data.tickEnds = null;
         data.inTick = false;
     }
 }

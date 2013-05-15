@@ -43,7 +43,7 @@ enum EventState {
 class EventData {
     public source: EventSource;
     public stream: EventStream;
-    public closed: bool = false;
+    public closed: boolean = false;
     public receiveCallbacks: lists.LinkedList;
     public rejectCallbacks: lists.LinkedList;
     public closeCallbacks: lists.LinkedList;
@@ -72,7 +72,7 @@ class EventData {
       * @param value The value to send to subscribers
       * @param synchronous A flag that specifies whether to execute callbacks synchronously or asynchronously
       */
-    public accept(value: any, synchronous?: bool): void {
+    public accept(value: any, synchronous?: boolean): void {
         if (this.closed) {
             return;
         }
@@ -86,7 +86,7 @@ class EventData {
       * @param value The value to send to subscribers
       * @param synchronous A flag that specifies whether to execute callbacks synchronously or asynchronously
       */
-    public send(value: any, synchronous?: bool): void {
+    public send(value: any, synchronous?: boolean): void {
         if (this.closed) {
             return;
         }
@@ -130,7 +130,7 @@ class EventData {
       * @param value The error value to send to subscribers
       * @param synchronous A flag that specifies whether to execute callbacks synchronously or asynchronously
       */
-    public reject(value: any, synchronous?: bool): void {
+    public reject(value: any, synchronous?: boolean): void {
         if (this.closed) {
             return;
         }
@@ -142,7 +142,7 @@ class EventData {
     /** close algorithm
       * @param synchronous A flag that specifies whether to execute callbacks synchronously or asynchronously
       */
-    public close(synchronous?: bool): void {
+    public close(synchronous?: boolean): void {
         if (this.closed) {
             return;
         }
@@ -283,7 +283,7 @@ class EventData {
       *
       * @link http://dom.spec.whatwg.org/#concept-future-process
       */
-    public process(callbacks: lists.LinkedList, result: any, remove: bool, synchronous: bool): void {
+    public process(callbacks: lists.LinkedList, result: any, remove: boolean, synchronous: boolean): void {
         if (!synchronous) {
             futures.Future.run(() => this.process(callbacks, result, remove, true), this.token);
         }
@@ -425,7 +425,7 @@ export class EventStream {
         }
     }
 
-    public static isEventStream(value: any): bool {
+    public static isEventStream(value: any): boolean {
         return symbols.hasBrand(value, EventStream);
     }
 

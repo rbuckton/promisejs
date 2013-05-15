@@ -1,6 +1,10 @@
 var fs = require("fs");
 var path = require("path");
-var opts = { module: "umd", obj: "obj", experimental: true };
+var opts = { 
+    module: "umd",      // special module type "umd". Uses "commonjs" but wraps the file in a umd loader that supports cjs, amd, and <script> loading
+    obj: "obj", 
+    experimental: true 
+};
 
 directory("obj");
 directory("built");
@@ -11,7 +15,7 @@ var symbols = {
     target: "built/symbols.js",
     inputs: ["src/symbols.ts"],
     outputs: ["built/symbols.js"],
-    deps: [dirs, "Jakefile", "src/umd.tmpl"]
+    deps: [dirs, "Jakefile", "src/umd.js"]
 };
 
 var lists = {
@@ -65,6 +69,11 @@ var modules = [
     httpclient, 
     tests
 ];
+
+// add directories
+dirs.forEach(function(dir) { 
+    directory(dir); 
+})
 
 // register all modules
 modules.forEach(function (module) {
@@ -193,7 +202,7 @@ function tsc(target, prereqs, sources, options) {
                     }
                     
                     // load the umd template
-                    var umdSrc = fs.readFileSync("src/umd.tmpl").toString();
+                    var umdSrc = fs.readFileSync("src/umd.js").toString();
                     
                     // transform the template
                     var finalSrc = umdSrc.replace(/\${(\w+)}/gi, function (_, id) {

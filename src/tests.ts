@@ -5,9 +5,6 @@ import events = module("events");
 import assert = module("assert");
 import domain = module("domain");
 
-var _ = events.EventEmitter;
-var CancellationSource = tasks.CancellationSource;
-
 var tests = [
     function Future_accept_value() {
         futures.Future.accept(1).done(
@@ -346,7 +343,7 @@ var tests = [
             assert.ifError);
     },
     function Cancel_Future() {
-        var C = new CancellationSource();
+        var C = new tasks.CancellationSource();
         var R;
         var F = new futures.Future(function(resolver) { R = resolver; }, C.token);
         C.cancel();
@@ -355,7 +352,7 @@ var tests = [
             assert.ifError);
     },
     function Cancel_Future_setTimeout() {
-        var C = new CancellationSource();
+        var C = new tasks.CancellationSource();
         var F = new futures.Future<number>(function (resolver) {
             var timerId = setTimeout(() => {
                 resolver.resolve(1);

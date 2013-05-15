@@ -35,9 +35,6 @@
     var assert = require("assert");
     var domain = require("domain");
     
-    var _ = events.EventEmitter;
-    var CancellationSource = tasks.CancellationSource;
-    
     var tests = [
         function Future_accept_value() {
             futures.Future.accept(1).done(function (v) {
@@ -408,7 +405,7 @@
             }, assert.ifError);
         },
         function Cancel_Future() {
-            var C = new CancellationSource();
+            var C = new tasks.CancellationSource();
             var R;
             var F = new futures.Future(function (resolver) {
                 R = resolver;
@@ -417,7 +414,7 @@
             F.done(assert.ifError, assert.ifError);
         },
         function Cancel_Future_setTimeout() {
-            var C = new CancellationSource();
+            var C = new tasks.CancellationSource();
             var F = new futures.Future(function (resolver) {
                 var timerId = setTimeout(function () {
                     resolver.resolve(1);

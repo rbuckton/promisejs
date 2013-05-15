@@ -307,6 +307,18 @@
             configurable: true
         });
     
+        Object.defineProperty(Dispatcher.prototype, "nextTickWillYield", {
+            get: function () {
+                var data = DispatcherDataSym.get(this);
+                if (!data || !symbols.hasBrand(this, Dispatcher))
+                    throw new TypeError("'this' is not a Dispatcher object");
+    
+                return !data.inTick || Date.now() >= data.tickEnds;
+            },
+            enumerable: true,
+            configurable: true
+        });
+    
         Dispatcher.prototype.post = function (task) {
             var args = [];
             for (var _i = 0; _i < (arguments.length - 1); _i++) {
@@ -344,6 +356,8 @@
         DispatcherData.default = null;
     
         DispatcherData.current = null;
+    
+        DispatcherData.MAX_TICK_DURATION = 100;
         return DispatcherData;
     })();
     
@@ -474,6 +488,8 @@
         RequestTick(data);
     
         data.inTick = true;
+        data.tickStarted = Date.now();
+        data.tickEnds = data.tickStarted + DispatcherData.MAX_TICK_DURATION;
         try  {
             while (data.tasks.head) {
                 var next = data.tasks.head;
@@ -481,10 +497,20 @@
     
                 var callback = next.value;
                 callback();
+    
+                if (Date.now() >= data.tickEnds) {
+                    if (data.tasks.head) {
+                        return;
+                    } else {
+                        break;
+                    }
+                }
             }
     
             CancelTick(data);
         } finally {
+            data.tickStarted = null;
+            data.tickEnds = null;
             data.inTick = false;
         }
     }

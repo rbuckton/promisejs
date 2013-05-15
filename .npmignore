@@ -1,0 +1,11 @@
+bin/
+lib/
+older/
+src/
+
+Header.txt
+index.html
+Jakefile
+LICENSE
+README.md
+.npmignore

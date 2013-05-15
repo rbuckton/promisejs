@@ -73,7 +73,7 @@ export class Symbol<TValue> {
       * @param obj The object to test for presence of the symbol.
       * @returns True if the symbol is defined; otherwise, false.
       */
-    public has(obj: any): bool {
+    public has(obj: any): boolean {
         if (Object(obj) !== obj) {
             throw new TypeError("Invalid argument: obj");
         }
@@ -116,7 +116,7 @@ export function brand(name: string): (target: Function) => Function {
  * @param name The brand to test
  * @returns True if the object or one if its prototypes has the specified brand; otherwise, false
  */
-export function hasBrand(obj: any, name: string) : bool;
+export function hasBrand(obj: any, name: string) : boolean;
 
 /** 
  * Determines whether an object has the specified branding
@@ -124,7 +124,7 @@ export function hasBrand(obj: any, name: string) : bool;
  * @param name The brand to test
  * @returns True if the object or one if its prototypes has the specified brand; otherwise, false
  */
-export function hasBrand(obj: any, name: any) : bool;
+export function hasBrand(obj: any, name: any) : boolean;
 
 /** 
  * Determines whether an object has the specified branding
@@ -132,7 +132,7 @@ export function hasBrand(obj: any, name: any) : bool;
  * @param name The brand to test
  * @returns True if the object or one if its prototypes has the specified brand; otherwise, false
  */
-export function hasBrand(obj: any, name: any) : bool {
+export function hasBrand(obj: any, name: any) : boolean {
     
     if (typeof name === "function") {
         var func = <Function>name;
