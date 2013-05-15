@@ -475,13 +475,14 @@
             var _this = this;
             this.errors = [];
             this.requested = 0;
+            this.started = 0;
             this.completed = 0;
             this.passed = 0;
             this.failed = 0;
             this.testCases = tests.map(function (test) {
                 var testCase = new TestCase(test);
                 testCase.on("start", function () {
-                    _this.requested++;
+                    _this.started++;
                 });
                 testCase.on("pass", function () {
                     _this.passed++;
@@ -500,6 +501,7 @@
             });
         }
         TestRun.prototype.run = function () {
+            this.requested = this.testCases.length;
             this.testCases.forEach(function (testCase) {
                 return testCase.run();
             });

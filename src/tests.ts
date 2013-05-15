@@ -416,6 +416,7 @@ class TestCase extends events.EventEmitter {
 class TestRun {
     public errors = [];
     public requested = 0;
+    public started = 0;
     public completed = 0;
     public passed = 0;
     public failed = 0;
@@ -425,7 +426,7 @@ class TestRun {
         this.testCases = tests.map(test => {
             var testCase = new TestCase(test);
             testCase.on("start", () => { 
-                this.requested++; 
+                this.started++; 
             });
             testCase.on("pass", () => { 
                 this.passed++; 
@@ -445,6 +446,7 @@ class TestRun {
     }
 
     public run() {
+        this.requested = this.testCases.length;
         this.testCases.forEach(testCase => testCase.run());
     }
 

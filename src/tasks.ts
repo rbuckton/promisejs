@@ -10,7 +10,8 @@ import symbols = module("symbols");
 import lists = module("lists");
 
 var CancellationDataSym = new symbols.Symbol<CancellationData>("tasks.CancellationData");
-var DispatcherDataSym = new symbols.Symbol<DispatcherData>("tasks.DispatcherData");
+var SchedulerSym = new symbols.Symbol<Scheduler>("tasks.Scheduler");
+var isNode = typeof process === "object" && Object.prototype.toString.call(process) === "[object process]" && typeof process.nextTick === "function";
 
 /** An error that contains multiple errors
   */
@@ -428,6 +429,178 @@ export interface DispatcherPostOptions {
 	delay?: number;
 }
 
+class Scheduler {
+    private activeQueue: lists.LinkedList<() => void>;
+    private nextQueue: lists.LinkedList<() => void>;
+    private tickRequested: boolean = false;
+
+    public static create(): Scheduler {
+        if (typeof setImmediate !== "function") {
+            return new SetImmediateScheduler();
+        }
+
+        if (typeof MessageChannel === "function") {
+            return new MessageChannelScheduler();
+        }
+
+        if (isNode) {
+            return new NodeScheduler();
+        }
+       
+        return new Scheduler();
+    }
+
+    public post(task: () => void, options: DispatcherPostOptions, token: CancellationToken): void {
+        if (options) {
+            if (options.synchronous) {
+                this.postSynchronous(task, token);
+                return;
+            }
+            else if ("delay" in options) {
+                this.postAfter(task, options.delay, token);
+                return;
+            }
+        }
+        
+        if (!this.nextQueue) {
+            this.nextQueue = new lists.LinkedList<() => void>();
+        }
+
+        var node = this.nextQueue.push(() => {
+            if (token) {
+                if (token.canceled) {
+                    return;
+                }
+
+                if (tokenHandle) {
+                    token.unregister(tokenHandle);
+                }
+            }
+
+            task();
+        });
+        
+        var tokenHandle: number;
+        if (token) {
+            tokenHandle = token.register(() => {
+                if (node.list) {
+                    (<any>node.list).deleteNode(node);
+                }
+            });
+        }
+
+        this.requestTick();
+    }
+
+    private postSynchronous(task: () => void, token: CancellationToken): void {
+        if (!(token && token.canceled)) {
+            try {
+                task();
+            }
+            catch (e) {
+                this.post(() => { throw e; }, null, null);
+            }
+        }        
+    }
+
+    private postAfter(task: () => void, delay: number, token: CancellationToken): void {
+        var taskHandle = setTimeout(() => {
+            if (token && tokenHandle) {
+                token.unregister(tokenHandle);
+            }
+
+            task();
+        }, delay);
+
+        var tokenHandle: number;
+        if (token) {
+            tokenHandle = token.register(() => {
+                clearTimeout(taskHandle);
+            });
+        }
+    }
+
+    private requestTick(): void {
+        if (!this.tickRequested) {
+            this.requestTickCore();
+            this.tickRequested = true;
+        }
+    }
+
+    public requestTickCore(): void {
+        // default to setTimeout
+        this.postAfter(() => this.tick(), 0, null);
+    }
+
+    public tick(): void {
+        // clear the tick request
+        this.tickRequested = false;
+
+        // drain the active queue for any pending work
+        if (this.activeQueue) {
+            this.drainQueue();
+        }
+
+        // swap queues
+        this.activeQueue = this.nextQueue;
+        this.nextQueue = null;
+
+        // if we have new work to do, request a new tick
+        if (this.activeQueue) {
+            this.requestTick();
+        }
+    }
+
+    private drainQueue(): void {
+        try {
+            while (this.activeQueue.head) {
+                var task = this.activeQueue.shift();
+                task();
+            }
+        }
+        finally {
+
+            // if we're not done, request a new tick to continue processing
+            if (this.activeQueue.head) {
+                this.requestTick();
+            }
+        }
+
+        this.activeQueue = null;
+    }
+}
+
+class SetImmediateScheduler extends Scheduler {
+    public requestTickCore(): void {
+        setImmediate(() => { 
+            this.tick(); 
+        });
+    }
+}
+
+class MessageChannelScheduler extends Scheduler {
+    private channel: MessageChannel;
+
+    constructor() {
+        super();
+        this.channel = new MessageChannel();
+        this.channel.port1.onmessage = () => { this.tick(); };
+    }
+
+    public requestTickCore(): void {
+        this.channel.port2.postMessage(null);
+    }
+}
+
+class NodeScheduler extends Scheduler {
+    public requestTickCore(): void {
+        process.nextTick(() => { this.tick(); });
+    }
+}
+
+var defaultDispatcher: Dispatcher = null;
+var currentDispatcher: Dispatcher = null;
+
 /**
  * Dispatches microtasks to the event loop
  */
@@ -436,8 +609,8 @@ export class Dispatcher {
 	 * A dispatcher for microtasks in the event loop
 	 */
 	constructor() {
-		var data = new DispatcherData(this);
-		DispatcherDataSym.set(this, data);
+        var scheduler = Scheduler.create();
+		SchedulerSym.set(this, scheduler);
 	}
 
 	/**
@@ -445,12 +618,12 @@ export class Dispatcher {
 	 * @type {Dispatcher}
 	 */
 	public static get default(): Dispatcher {
-		if (!DispatcherData.default) {
-			DispatcherData.default = new Dispatcher();
-			Object.freeze(DispatcherData.default);
+		if (!defaultDispatcher) {
+			defaultDispatcher = new Dispatcher();
+			Object.freeze(defaultDispatcher);
 		}
 
-		return DispatcherData.default;
+		return defaultDispatcher;
 	}
 
 	/**
@@ -458,23 +631,12 @@ export class Dispatcher {
 	 * @type {Dispatcher}
 	 */
 	public static get current(): Dispatcher {
-		if (!DispatcherData.current) {
-			DispatcherData.current = Dispatcher.default;
+		if (!currentDispatcher) {
+			currentDispatcher = Dispatcher.default;
 		}
 
-		return DispatcherData.current;
+		return currentDispatcher;
 	}
-
-    /**
-     * Gets a value indicating whether the next tick will yield to the event loop
-     * @type {boolean}
-     */
-    public get nextTickWillYield(): boolean {
-        var data = DispatcherDataSym.get(this);
-        if (!data || !symbols.hasBrand(this, Dispatcher)) throw new TypeError("'this' is not a Dispatcher object");
-
-        return !data.inTick || Date.now() >= data.tickEnds;
-    }
 
     /** Posts a microtask to the dispatcher
       * @param task The task to schedule
@@ -506,9 +668,8 @@ export class Dispatcher {
       * @param token The token to use for cancellation
       */
     public post(task: () => void, ...args: any[]): void {
-    	var data = DispatcherDataSym.get(this);
-    	if (!data || !symbols.hasBrand(this, Dispatcher)) throw new TypeError("'this' is not a Dispatcher object");
-        
+        if (!symbols.hasBrand(this, Dispatcher)) throw new TypeError("'this' is not a Dispatcher object");
+
         var argi = 0;
         var options: DispatcherPostOptions = null;
         var token: CancellationToken = null;
@@ -522,195 +683,28 @@ export class Dispatcher {
         	options = args[argi];
         }
 
-        PostTask(data, task, options, token);
+        // bind the task to the dispatcher
+        task = BindTask(this, task);
+
+        // schedule the task
+        SchedulerSym.get(this).post(task, options, token);
     }
 }
 
 symbols.brand("Dispatcher")(Dispatcher);
 
-/**
- * Internal data and algorithms for a Dispatcher
- */
-class DispatcherData {
-
-    /**
-     * The default dispatcher
-     * @type {Dispatcher}
-     */
-    public static default: Dispatcher = null;
-
-    /**
-     * The current dispatcher
-     * @type {Dispatcher}
-     */
-    public static current: Dispatcher = null;
-
-    /**
-     * The maximum amount of time to spend executing local ticks before yielding to the event loop
-     * @type {number}
-     */
-    public static MAX_TICK_DURATION: number = 100;
-
-    /**
-     * The related dispatcher for the internal data
-     * @type {Dispatcher}
-     */
-    public dispatcher: Dispatcher;
-
-    /**
-     * A linked list of tasks to execute.
-     * @type {lists.LinkedList}
-     */
-    public tasks: lists.LinkedList<() => void>;
-
-    /**
-     * A handle for the next tick
-     * @type {any}
-     */
-    public tickHandle: any;
-
-    /**
-     * A value indicating whether the dispatcher is currently in a tick
-     * @type {Boolean}
-     */
-    public inTick: boolean = false;
-
-    /**
-     * The time the tick started
-     * @type {number}
-     */
-    public tickStarted: number;
-
-    /**
-     * The time the tick must end
-     * @type {number}
-     */
-    public tickEnds: number;
-
-    /**
-     * Internal data and algorithms for a dispatcher
-     * @param dispatcher The related dispatcher
-     */
-    constructor(dispatcher: Dispatcher) {
-        this.dispatcher = dispatcher;
-    }
-}
-
-/** Posts a microtask to the dispatcher
-  * @param task The task to schedule
-  * @param token The token to use for cancellation
-  */
-function PostTask(data: DispatcherData, task: () => void, options: DispatcherPostOptions, token: CancellationToken): void {
-    var tokenHandle: number;
-    var taskHandle: any;
-
-    // bind the task to the dispatcher
-    task = BindTask(data, task);
-
-    if (options) {
-        if (options.synchronous) {
-
-            // execute the task synchronously, but throw the exception to the engine
-            if (!(token && token.canceled)) {
-                try {
-                    task();
-                }
-                catch (e) {
-                    PostTask(data, () => { throw e; }, null, null);
-                }
-            }
-
-            return;
-        }
-        else if ("delay" in options) {
-
-            // execute the task after a delay
-            taskHandle = setTimeout(() => {
-                if (token) {
-                    if (tokenHandle) {
-                        token.unregister(tokenHandle);
-                    }
-                }
-
-                task();
-
-            }, options.delay);
-            
-            if (token) {
-                tokenHandle = token.register(() => { 
-                    clearTimeout(taskHandle);
-                });
-            }
-
-            return;
-        }
-        else if (options.fair) {
-
-            // execute the task in the next turn
-            taskHandle = SetImmediate(() => {
-                if (token) {
-                    if (tokenHandle) {
-                        token.unregister(tokenHandle);
-                    }
-                }
-
-                task();
-            });
-            
-            if (token) {
-                tokenHandle = token.register(() => { 
-                    ClearImmediate(taskHandle) 
-                });
-            }
-            return;
-        }
-    }
-
-    // execute the task at the end of the turn
-    if (data.tasks == null) {
-        data.tasks = new lists.LinkedList<() => void>();
-    }
-
-    // enqueue the task
-    var node = data.tasks.push(() => {
-        if (token) {
-            token.unregister(tokenHandle);
-            if (token.canceled) {
-                return;
-            }
-        }
-
-        task();
-    });
-
-    // request a tick 
-    RequestTick(data);
-
-    if (token) {
-        // if the token is canceled, we don't need to process this task
-        tokenHandle = token.register(() => { 
-            data.tasks.deleteNode(node);
-
-            // if there are no tasks left, cancel the next tick request
-            if (!data.tasks.head) {
-                CancelTick(data);
-            }
-        });
-    }
-}
-
 /** binds a task to a dispatcher 
   * @param task The task to bind
   */
-function BindTask(data: DispatcherData, task: () => void): () => void {
+function BindTask(dispatcher: Dispatcher, task: () => void): () => void {
     var wrapped = () => {
-        var previousDispatcher = DispatcherData.current;
-        DispatcherData.current = data.dispatcher;
+        var previousDispatcher = currentDispatcher;
+        currentDispatcher = dispatcher;
         try {
             task();
         }
         finally {
-            DispatcherData.current = previousDispatcher;
+            currentDispatcher = previousDispatcher;
         }           
     }
     
@@ -722,103 +716,8 @@ function BindTask(data: DispatcherData, task: () => void): () => void {
     return wrapped;
 }
 
-/** requests a tick to process microtasks
-  */
-function RequestTick(data: DispatcherData) {
-    // do not request a tick if we are in a tick
-    if (!data.inTick) {
-        if (!data.tickHandle && data.tasks.head) {
-            data.tickHandle = SetImmediate(() => { Tick(data); });
-        }
-    }
-}
-
-/** cancels the pending tick request
-  */
-function CancelTick(data: DispatcherData) {
-    if (data.tickHandle) {
-        ClearImmediate(data.tickHandle);
-        data.tickHandle = null;
-    }
-}
-
-/** handles processing of tasks
-  */
-function Tick(data: DispatcherData) {
-    // cancel the previous tick
-    CancelTick(data);
-
-    // request a new tick in the event of an error being thrown
-    RequestTick(data);
-
-    // begin processing the queue
-    data.inTick = true;
-    data.tickStarted = Date.now();    
-    data.tickEnds = data.tickStarted + DispatcherData.MAX_TICK_DURATION;    
-    try {
-
-        // Dequeue each pending task from the queue. If an exception is thrown, 
-        // it will bubble to the engine's default unhandled exception event.
-        // If we process all pending tasks and there are none that remain, we can
-        // safely cancel the next tick. 
-        // NOTE: We need a way to to ensure that we start a new Macro-task for some cases. 
-        while (data.tasks.head) {
-            var next = data.tasks.head;
-            data.tasks.deleteNode(next);
-
-            // NOTE: this may throw, that's ok. If it throws, we can continue processing in a later tick (assuming we ever get to it, depending on the engine).
-            var callback = next.value;
-            callback();
-
-            // check to see if we should continue processing
-            if (Date.now() >= data.tickEnds) {
-
-                // maximum time in this tick has elapsed
-                if (data.tasks.head) {
-
-                    // more tasks to process, yield to the next tick
-                    return;
-                }
-                else {
-                    // no more tasks to process, exit the loop and cancel the next tick
-                    break;
-                }
-            }
-        }
-
-        // No exceptions thrown, and no new tasks added. cancel the requested tick
-        CancelTick(data);
-    }
-    finally {
-        data.tickStarted = null;
-        data.tickEnds = null;
-        data.inTick = false;
-    }
-}
-
 // feature detect our ability to schedule
 var GetDomain = (): any => null;
-var SetImmediate: (callback: () => void) => any;
-var ClearImmediate: (handle: any) => void;
-
-if (typeof setImmediate === "function") {
-    SetImmediate = (task: () => void) => setImmediate(task);
-    ClearImmediate = (handle: any) => clearImmediate(handle);
-}
-else if (typeof process !== "undefined" && Object(process) === process && typeof process.nextTick === "function") {
+if (isNode) {
     GetDomain = (): any => (<any>process).domain;
-    SetImmediate = (task: () => void) => {
-        var handle = { canceled: false };
-        process.nextTick(() => {
-            if (!handle.canceled) {
-                task();
-            }
-        });
-        return handle;
-    }        
-    ClearImmediate = (handle: any) => { if (handle) handle.canceled = true; }
-}
-else {
-    SetImmediate = (task: () => void) => setTimeout(task, 0);
-    ClearImmediate = (handle: any) => clearTimeout(handle);
 }

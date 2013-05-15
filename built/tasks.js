@@ -6,7 +6,7 @@
  */
 (function (definition, global) {
     if (typeof define === "function" && define.amd) {
-        define(["require", "exports", "./symbols"], definition);
+        define(["require", "exports"], definition);
     }
     else if (typeof require === "function" && typeof exports === "object" && typeof module === "object") {
         definition(require, module["exports"] || exports);
@@ -23,11 +23,18 @@
     }
 })
 (function (require, exports) {
+    var __extends = this.__extends || function (d, b) {
+        for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
+        function __() { this.constructor = d; }
+        __.prototype = b.prototype;
+        d.prototype = new __();
+    };
     var symbols = require("./symbols");
     var lists = require("./lists");
     
     var CancellationDataSym = new symbols.Symbol("tasks.CancellationData");
-    var DispatcherDataSym = new symbols.Symbol("tasks.DispatcherData");
+    var SchedulerSym = new symbols.Symbol("tasks.Scheduler");
+    var isNode = typeof process === "object" && Object.prototype.toString.call(process) === "[object process]" && typeof process.nextTick === "function";
     
     var AggregateError = (function () {
         function AggregateError() {
@@ -277,19 +284,202 @@
         }, ms);
     }
     
+    var Scheduler = (function () {
+        function Scheduler() {
+            this.tickRequested = false;
+        }
+        Scheduler.create = function () {
+            if (typeof setImmediate !== "function") {
+                return new SetImmediateScheduler();
+            }
+    
+            if (typeof MessageChannel === "function") {
+                return new MessageChannelScheduler();
+            }
+    
+            if (isNode) {
+                return new NodeScheduler();
+            }
+    
+            return new Scheduler();
+        };
+    
+        Scheduler.prototype.post = function (task, options, token) {
+            if (options) {
+                if (options.synchronous) {
+                    this.postSynchronous(task, token);
+                    return;
+                } else if ("delay" in options) {
+                    this.postAfter(task, options.delay, token);
+                    return;
+                }
+            }
+    
+            if (!this.nextQueue) {
+                this.nextQueue = new lists.LinkedList();
+            }
+    
+            var node = this.nextQueue.push(function () {
+                if (token) {
+                    if (token.canceled) {
+                        return;
+                    }
+    
+                    if (tokenHandle) {
+                        token.unregister(tokenHandle);
+                    }
+                }
+    
+                task();
+            });
+    
+            var tokenHandle;
+            if (token) {
+                tokenHandle = token.register(function () {
+                    if (node.list) {
+                        (node.list).deleteNode(node);
+                    }
+                });
+            }
+    
+            this.requestTick();
+        };
+    
+        Scheduler.prototype.postSynchronous = function (task, token) {
+            if (!(token && token.canceled)) {
+                try  {
+                    task();
+                } catch (e) {
+                    this.post(function () {
+                        throw e;
+                    }, null, null);
+                }
+            }
+        };
+    
+        Scheduler.prototype.postAfter = function (task, delay, token) {
+            var taskHandle = setTimeout(function () {
+                if (token && tokenHandle) {
+                    token.unregister(tokenHandle);
+                }
+    
+                task();
+            }, delay);
+    
+            var tokenHandle;
+            if (token) {
+                tokenHandle = token.register(function () {
+                    clearTimeout(taskHandle);
+                });
+            }
+        };
+    
+        Scheduler.prototype.requestTick = function () {
+            if (!this.tickRequested) {
+                this.requestTickCore();
+                this.tickRequested = true;
+            }
+        };
+    
+        Scheduler.prototype.requestTickCore = function () {
+            var _this = this;
+            this.postAfter(function () {
+                return _this.tick();
+            }, 0, null);
+        };
+    
+        Scheduler.prototype.tick = function () {
+            this.tickRequested = false;
+    
+            if (this.activeQueue) {
+                this.drainQueue();
+            }
+    
+            this.activeQueue = this.nextQueue;
+            this.nextQueue = null;
+    
+            if (this.activeQueue) {
+                this.requestTick();
+            }
+        };
+    
+        Scheduler.prototype.drainQueue = function () {
+            try  {
+                while (this.activeQueue.head) {
+                    var task = this.activeQueue.shift();
+                    task();
+                }
+            } finally {
+                if (this.activeQueue.head) {
+                    this.requestTick();
+                }
+            }
+    
+            this.activeQueue = null;
+        };
+        return Scheduler;
+    })();
+    
+    var SetImmediateScheduler = (function (_super) {
+        __extends(SetImmediateScheduler, _super);
+        function SetImmediateScheduler() {
+            _super.apply(this, arguments);
+        }
+        SetImmediateScheduler.prototype.requestTickCore = function () {
+            var _this = this;
+            setImmediate(function () {
+                _this.tick();
+            });
+        };
+        return SetImmediateScheduler;
+    })(Scheduler);
+    
+    var MessageChannelScheduler = (function (_super) {
+        __extends(MessageChannelScheduler, _super);
+        function MessageChannelScheduler() {
+            var _this = this;
+            _super.call(this);
+            this.channel = new MessageChannel();
+            this.channel.port1.onmessage = function () {
+                _this.tick();
+            };
+        }
+        MessageChannelScheduler.prototype.requestTickCore = function () {
+            this.channel.port2.postMessage(null);
+        };
+        return MessageChannelScheduler;
+    })(Scheduler);
+    
+    var NodeScheduler = (function (_super) {
+        __extends(NodeScheduler, _super);
+        function NodeScheduler() {
+            _super.apply(this, arguments);
+        }
+        NodeScheduler.prototype.requestTickCore = function () {
+            var _this = this;
+            process.nextTick(function () {
+                _this.tick();
+            });
+        };
+        return NodeScheduler;
+    })(Scheduler);
+    
+    var defaultDispatcher = null;
+    var currentDispatcher = null;
+    
     var Dispatcher = (function () {
         function Dispatcher() {
-            var data = new DispatcherData(this);
-            DispatcherDataSym.set(this, data);
+            var scheduler = Scheduler.create();
+            SchedulerSym.set(this, scheduler);
         }
         Object.defineProperty(Dispatcher, "default", {
             get: function () {
-                if (!DispatcherData.default) {
-                    DispatcherData.default = new Dispatcher();
-                    Object.freeze(DispatcherData.default);
+                if (!defaultDispatcher) {
+                    defaultDispatcher = new Dispatcher();
+                    Object.freeze(defaultDispatcher);
                 }
     
-                return DispatcherData.default;
+                return defaultDispatcher;
             },
             enumerable: true,
             configurable: true
@@ -297,23 +487,11 @@
     
         Object.defineProperty(Dispatcher, "current", {
             get: function () {
-                if (!DispatcherData.current) {
-                    DispatcherData.current = Dispatcher.default;
+                if (!currentDispatcher) {
+                    currentDispatcher = Dispatcher.default;
                 }
     
-                return DispatcherData.current;
-            },
-            enumerable: true,
-            configurable: true
-        });
-    
-        Object.defineProperty(Dispatcher.prototype, "nextTickWillYield", {
-            get: function () {
-                var data = DispatcherDataSym.get(this);
-                if (!data || !symbols.hasBrand(this, Dispatcher))
-                    throw new TypeError("'this' is not a Dispatcher object");
-    
-                return !data.inTick || Date.now() >= data.tickEnds;
+                return currentDispatcher;
             },
             enumerable: true,
             configurable: true
@@ -324,8 +502,7 @@
             for (var _i = 0; _i < (arguments.length - 1); _i++) {
                 args[_i] = arguments[_i + 1];
             }
-            var data = DispatcherDataSym.get(this);
-            if (!data || !symbols.hasBrand(this, Dispatcher))
+            if (!symbols.hasBrand(this, Dispatcher))
                 throw new TypeError("'this' is not a Dispatcher object");
     
             var argi = 0;
@@ -340,7 +517,9 @@
                 options = args[argi];
             }
     
-            PostTask(data, task, options, token);
+            task = BindTask(this, task);
+    
+            SchedulerSym.get(this).post(task, options, token);
         };
         return Dispatcher;
     })();
@@ -348,112 +527,14 @@
     
     symbols.brand("Dispatcher")(Dispatcher);
     
-    var DispatcherData = (function () {
-        function DispatcherData(dispatcher) {
-            this.inTick = false;
-            this.dispatcher = dispatcher;
-        }
-        DispatcherData.default = null;
-    
-        DispatcherData.current = null;
-    
-        DispatcherData.MAX_TICK_DURATION = 100;
-        return DispatcherData;
-    })();
-    
-    function PostTask(data, task, options, token) {
-        var tokenHandle;
-        var taskHandle;
-    
-        task = BindTask(data, task);
-    
-        if (options) {
-            if (options.synchronous) {
-                if (!(token && token.canceled)) {
-                    try  {
-                        task();
-                    } catch (e) {
-                        PostTask(data, function () {
-                            throw e;
-                        }, null, null);
-                    }
-                }
-    
-                return;
-            } else if ("delay" in options) {
-                taskHandle = setTimeout(function () {
-                    if (token) {
-                        if (tokenHandle) {
-                            token.unregister(tokenHandle);
-                        }
-                    }
-    
-                    task();
-                }, options.delay);
-    
-                if (token) {
-                    tokenHandle = token.register(function () {
-                        clearTimeout(taskHandle);
-                    });
-                }
-    
-                return;
-            } else if (options.fair) {
-                taskHandle = SetImmediate(function () {
-                    if (token) {
-                        if (tokenHandle) {
-                            token.unregister(tokenHandle);
-                        }
-                    }
-    
-                    task();
-                });
-    
-                if (token) {
-                    tokenHandle = token.register(function () {
-                        ClearImmediate(taskHandle);
-                    });
-                }
-                return;
-            }
-        }
-    
-        if (data.tasks == null) {
-            data.tasks = new lists.LinkedList();
-        }
-    
-        var node = data.tasks.push(function () {
-            if (token) {
-                token.unregister(tokenHandle);
-                if (token.canceled) {
-                    return;
-                }
-            }
-    
-            task();
-        });
-    
-        RequestTick(data);
-    
-        if (token) {
-            tokenHandle = token.register(function () {
-                data.tasks.deleteNode(node);
-    
-                if (!data.tasks.head) {
-                    CancelTick(data);
-                }
-            });
-        }
-    }
-    
-    function BindTask(data, task) {
+    function BindTask(dispatcher, task) {
         var wrapped = function () {
-            var previousDispatcher = DispatcherData.current;
-            DispatcherData.current = data.dispatcher;
+            var previousDispatcher = currentDispatcher;
+            currentDispatcher = dispatcher;
             try  {
                 task();
             } finally {
-                DispatcherData.current = previousDispatcher;
+                currentDispatcher = previousDispatcher;
             }
         };
     
@@ -465,92 +546,12 @@
         return wrapped;
     }
     
-    function RequestTick(data) {
-        if (!data.inTick) {
-            if (!data.tickHandle && data.tasks.head) {
-                data.tickHandle = SetImmediate(function () {
-                    Tick(data);
-                });
-            }
-        }
-    }
-    
-    function CancelTick(data) {
-        if (data.tickHandle) {
-            ClearImmediate(data.tickHandle);
-            data.tickHandle = null;
-        }
-    }
-    
-    function Tick(data) {
-        CancelTick(data);
-    
-        RequestTick(data);
-    
-        data.inTick = true;
-        data.tickStarted = Date.now();
-        data.tickEnds = data.tickStarted + DispatcherData.MAX_TICK_DURATION;
-        try  {
-            while (data.tasks.head) {
-                var next = data.tasks.head;
-                data.tasks.deleteNode(next);
-    
-                var callback = next.value;
-                callback();
-    
-                if (Date.now() >= data.tickEnds) {
-                    if (data.tasks.head) {
-                        return;
-                    } else {
-                        break;
-                    }
-                }
-            }
-    
-            CancelTick(data);
-        } finally {
-            data.tickStarted = null;
-            data.tickEnds = null;
-            data.inTick = false;
-        }
-    }
-    
     var GetDomain = function () {
         return null;
     };
-    var SetImmediate;
-    var ClearImmediate;
-    
-    if (typeof setImmediate === "function") {
-        SetImmediate = function (task) {
-            return setImmediate(task);
-        };
-        ClearImmediate = function (handle) {
-            return clearImmediate(handle);
-        };
-    } else if (typeof process !== "undefined" && Object(process) === process && typeof process.nextTick === "function") {
+    if (isNode) {
         GetDomain = function () {
             return (process).domain;
-        };
-        SetImmediate = function (task) {
-            var handle = { canceled: false };
-            process.nextTick(function () {
-                if (!handle.canceled) {
-                    task();
-                }
-            });
-            return handle;
-        };
-        ClearImmediate = function (handle) {
-            if (handle)
-                handle.canceled = true;
-        };
-    } else {
-        SetImmediate = function (task) {
-            return setTimeout(task, 0);
-        };
-        ClearImmediate = function (handle) {
-            return clearTimeout(handle);
         };
     }
 }, this);
