@@ -71,7 +71,7 @@ var promisejs = {
     target: "built/promisejs.js",
     inputs: ["src/promisejs.ts"],
     outputs: ["built/promisejs.js"],
-    opts: { module: "commonjs", obj: "obj", experimental: true },
+    opts: { module: "commonjs", obj: "obj", experimental: true, comments: true },
     deps: [symbols, lists, tasks, futures, httpclient]
 }
 
