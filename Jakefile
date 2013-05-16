@@ -15,6 +15,7 @@ var symbols = {
     target: "built/symbols.js",
     inputs: ["src/symbols.ts"],
     outputs: ["built/symbols.js"],
+    opts: opts,
     deps: [dirs, "Jakefile", "src/umd.js"]
 };
 
@@ -22,6 +23,7 @@ var lists = {
     target: "built/lists.js",
     inputs: ["src/lists.ts"],
     outputs: ["built/lists.js"],
+    opts: opts,
     deps: [symbols]
 };
 
@@ -29,6 +31,7 @@ var tasks = {
     target: "built/tasks.js",
     inputs: ["src/tasks.ts"],
     outputs: ["built/tasks.js"],
+    opts: opts,
     deps: [symbols, lists]
 };
 
@@ -36,6 +39,7 @@ var futures = {
     target: "built/futures.js",
     inputs: ["src/futures.ts"],
     outputs: ["built/futures.js"],
+    opts: opts,
     deps: [symbols, lists, tasks]
 };
 
@@ -43,6 +47,7 @@ var eventstream = {
     target: "built/eventstream.js",
     inputs: ["src/eventstream.ts"],
     outputs: ["built/eventstream.js"],
+    opts: opts,
     deps: [symbols, lists, tasks, futures]
 };
 
@@ -50,6 +55,7 @@ var httpclient = {
     target: "built/httpclient.js",
     inputs: ["src/httpclient.ts"],
     outputs: ["built/httpclient.js"],
+    opts: opts,
     deps: [symbols, lists, tasks, futures]
 };
 
@@ -57,6 +63,15 @@ var tests = {
     target: "built/tests.js",
     inputs: ["src/tests.ts"],
     outputs: ["built/tests.js"],
+    opts: opts,
+    deps: [symbols, lists, tasks, futures, httpclient]
+}
+
+var promisejs = {
+    target: "built/promisejs.js",
+    inputs: ["src/promisejs.ts"],
+    outputs: ["built/promisejs.js"],
+    opts: { module: "commonjs", obj: "obj", experimental: true },
     deps: [symbols, lists, tasks, futures, httpclient]
 }
 
@@ -67,6 +82,7 @@ var modules = [
     futures,
     //eventstream, 
     httpclient, 
+    promisejs,
     tests
 ];
 
@@ -106,7 +122,7 @@ modules.forEach(function (module) {
 
     module.deps.forEach(depfind);
 
-    tsc(module.target, deps, module.inputs, { module: "umd", obj: "obj", experimental: true });    
+    tsc(module.target, deps, module.inputs, module.opts);    
 })
 
 task("default", ["build", "test"]);
@@ -149,7 +165,7 @@ function tsc(target, prereqs, sources, options) {
     
     if (!Array.isArray(sources)) {
         sources = [sources];
-    }
+      }
     
     // set a prereq on the source files
     if (Array.isArray(prereqs)) {
@@ -172,7 +188,7 @@ function tsc(target, prereqs, sources, options) {
         if (options.declcomments) cmd += " --declcomments";
         if (options.target) cmd += " --target " + options.target;
         if (/^amd$/i.test(options.module)) cmd += " --module amd";
-        if (/^umd$/i.test(options.module)) cmd += " --out " + (options.obj ? options.obj : "obj");
+        if (/^umd$/i.test(options.module) || options.obj) cmd += " --out " + (options.obj ? options.obj : "obj");
         if (options.debug) cmd += " --sourcemap";
         
         cmd += " " + sources.join(" ");
@@ -220,6 +236,9 @@ function tsc(target, prereqs, sources, options) {
                     
                     // write the file
                     fs.writeFileSync(target, finalSrc);                
+                }
+                else if (options.obj) {
+                    fs.renameSync(path.join(options.obj, path.basename(target)), target);
                 }
             }
             complete();
