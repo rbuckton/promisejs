@@ -169,11 +169,11 @@ Object.defineProperty(Object.prototype, "toString", {
         if (BrandSym.has(this)) {
             var name = BrandSym.get(this);
             switch (name) {
-                case "object":
-                case "function":
-                case "number":
-                case "boolean":
-                case "string":
+                case "Object":
+                case "Function":
+                case "Number":
+                case "Boolean":
+                case "String":
                 case "Array":
                 case "RegExp":
                 case "Date":

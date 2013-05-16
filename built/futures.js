@@ -240,7 +240,7 @@
             return new Future(function (resolver) {
                 tasks.Dispatcher.current.post(function () {
                     resolver.resolve(void 0);
-                }, { fair: true }, token);
+                }, token);
             }, token);
         };
     

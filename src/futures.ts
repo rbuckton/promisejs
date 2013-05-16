@@ -531,7 +531,7 @@ export class Future<T> {
      */
     public static yield(token?: tasks.CancellationToken): Future {
         return new Future(resolver => { 
-            tasks.Dispatcher.current.post(() => { resolver.resolve(void 0); }, { fair: true }, token); 
+            tasks.Dispatcher.current.post(() => { resolver.resolve(void 0); }, token); 
         }, token);
     }
 

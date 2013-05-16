@@ -413,12 +413,6 @@ function CancelAfter(data: CancellationData, ms: number): void {
  */
 export interface DispatcherPostOptions {
 	/**
-	 * A value indicating whether the dispatcher should prefer fairness and schedule 
-	 * the task in a later turn rather than the end of the turn.
-	 */
-	fair?: boolean;
-
-	/**
 	 * A value indicating whether the dispatcher to execute the task synchronously. Exceptions will be raised to the engine's unhandled exception handler.
 	 */
 	synchronous?: boolean;
