@@ -201,17 +201,9 @@ export class Uri {
 
     /**
      * Gets the string representation of the Uri
-     * @returns {String} The string content of the Uri
-     */
-    public toString(): string;
-
-    /**
-     * Gets the string representation of the Uri
      * @param format {String} A format specifier.
      * @returns {String} The string content of the Uri
      */
-    public toString(format: string): string;
-
     public toString(format?: string): string {
         switch (format) {
             case "origin":
@@ -338,8 +330,8 @@ export class Uri {
      */
     public static combine(baseUri: string, uri: string): Uri;
 
-    public static combine(baseUriAny: any, uriAny: any): Uri {
-        return new Uri(baseUriAny, uriAny);
+    public static combine(baseUri: any, uri: any): Uri {
+        return new Uri(baseUri, uri);
     }
 }
 

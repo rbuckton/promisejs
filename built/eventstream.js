@@ -28,7 +28,7 @@
     var linkedlist;
     (function (linkedlist) {
         function Append(list, node) {
-            if (node && !node.next && !node.list) {
+            if (node && !node.next) {
                 if (list.head) {
                     var pos = list.head.prev;
                     node.prev = pos;
@@ -40,8 +40,6 @@
                     node.prev = node;
                     list.head = node;
                 }
-    
-                node.list = list;
             }
     
             return node;
@@ -49,7 +47,7 @@
         linkedlist.Append = Append;
     
         function Delete(list, node) {
-            if (node && node.next && node.list === list) {
+            if (node && node.next) {
                 if (node.next !== node) {
                     node.next.prev = node.prev;
                     node.prev.next = node.next;
@@ -63,7 +61,7 @@
                     }
                 }
     
-                node.list = node.prev = node.next = null;
+                node.prev = node.next = null;
             }
     
             return node;
@@ -103,12 +101,12 @@
             this._eventData.accept(value);
         };
     
-        EventSource.prototype.send = function (value) {
-            this._eventData.send(value);
+        EventSource.prototype.resolve = function (value, token) {
+            this._eventData.resolve(value, token);
         };
     
-        EventSource.prototype.stream = function (value) {
-            this._eventData.send(value);
+        EventSource.prototype.merge = function (value, token) {
+            this._eventData.merge(value, token);
         };
     
         EventSource.prototype.reject = function (value) {
@@ -131,7 +129,7 @@
             var source = Object.create(EventSource.prototype);
             var data = new EventData(this, source, token);
             source.accept = source.accept.bind(source);
-            source.send = source.send.bind(source);
+            source.resolve = source.resolve.bind(source);
             source.reject = source.reject.bind(source);
             source.close = source.close.bind(source);
     
@@ -200,7 +198,7 @@
             return new EventStream(function (source) {
                 _this.listen(function (value) {
                     try  {
-                        source.send(projection.call(thisArg, value, index++, _this));
+                        source.resolve(projection.call(thisArg, value, index++, _this), cts.token);
                     } catch (e) {
                         source.reject(e);
                         cts.cancel();
@@ -483,7 +481,7 @@
                     try  {
                         done = done || !predicate.call(thisArg, value, index++, _this);
                         if (done) {
-                            source.send(value);
+                            source.accept(value);
                         }
                     } catch (e) {
                         source.reject(e);
@@ -502,7 +500,7 @@
                 _this.listen(function (value) {
                     try  {
                         if (predicate.call(thisArg, value, index++, _this)) {
-                            source.send(value);
+                            source.accept(value);
                         } else {
                             source.close();
                             cts.cancel();
@@ -529,7 +527,7 @@
     
                 _this.listen(function (value) {
                     if (done) {
-                        source.send(value);
+                        source.accept(value);
                     }
                 }, function (e) {
                     source.reject(e);
@@ -580,7 +578,7 @@
                     } else {
                         try  {
                             var result = projection.call(thisArg, value, right.shift(), index++, _this, other);
-                            source.send(result);
+                            source.accept(result);
                         } catch (e) {
                             source.reject(e);
                             cts.cancel();
@@ -600,7 +598,7 @@
                     } else {
                         try  {
                             var result = projection.call(thisArg, left.shift(), value, index++, _this, other);
-                            source.send(result);
+                            source.accept(result);
                         } catch (e) {
                             source.reject(e);
                             cts.cancel();
@@ -691,10 +689,10 @@
     var EventData = (function () {
         function EventData(events, source, token) {
             var _this = this;
-            this.closed = false;
             this.state = EventState.pending;
             Object.defineProperty(events, "_eventData", { value: this });
             Object.defineProperty(source, "_eventData", { value: this });
+    
             this.events = events;
             this.source = source;
             this.token = token;
@@ -706,38 +704,53 @@
             }
         }
         EventData.prototype.accept = function (value, synchronous) {
-            if (this.closed) {
+            if (this.state > EventState.sending) {
                 return;
             }
     
-            if (this.state === EventState.pending) {
-                if (!this.pending) {
-                    this.pending = [];
-                }
-    
-                this.pending.push(value);
-            } else {
-                this.process(this.receiveCallbacks, value, false, synchronous);
+            if (!this.pending) {
+                this.pending = {};
             }
+    
+            this.state = EventState.sending;
+            linkedlist.Append(this.pending, { kind: EventState.sending, value: value });
+    
+            this.processPending(synchronous);
         };
     
-        EventData.prototype.send = function (value, synchronous) {
+        EventData.prototype.resolve = function (value, token, synchronous) {
             var _this = this;
-            if (this.closed) {
+            if (this.state > EventState.sending) {
                 return;
             }
     
             if (futures.Future.isFuture(value)) {
+                var cts = new futures.CancellationSource(this.token, token);
+                if (!this.pending) {
+                    this.pending = {};
+                }
+    
+                this.state = EventState.sending;
+                var node = linkedlist.Append(this.pending, { kind: EventState.pending });
                 var future = value;
                 var resolve = function (value) {
-                    _this.accept(value, true);
+                    if (_this.state === EventState.canceled)
+                        return;
+                    node.value = value;
+                    node.kind = EventState.sending;
+                    _this.processPending(true);
                 };
                 var reject = function (value) {
-                    _this.reject(value, true);
+                    if (_this.state === EventState.canceled)
+                        return;
+                    node.value = value;
+                    node.kind = EventState.rejected;
+                    _this.state = EventState.rejected;
+                    _this.processPending(true);
                 };
     
                 try  {
-                    value.done(resolve, reject);
+                    value.done(resolve, reject, null, cts.token);
                 } catch (e) {
                     this.reject(e, synchronous);
                 }
@@ -748,104 +761,74 @@
             this.accept(value, synchronous);
         };
     
-        EventData.prototype.stream = function (value, synchronous) {
+        EventData.prototype.merge = function (stream, token) {
             var _this = this;
-            if (this.closed) {
-                return;
-            }
-    
-            if (EventStream.isEventStream(value)) {
-                var events = value;
-                if (events === this.events) {
-                    throw new TypeError("EventStream cannot stream itself");
-                }
-    
-                var receive = function (value) {
-                    _this.accept(value, true);
-                };
-                var reject = function (value) {
-                    _this.reject(value, true);
-                };
-                try  {
-                    events.listen(receive, reject, null, null, this.token);
-                } catch (e) {
-                    this.reject(e, synchronous);
-                }
-    
-                return;
-            }
-    
-            this.send(value, synchronous);
+            stream.listen(function (value) {
+                _this.accept(value, true);
+            }, function (e) {
+                _this.reject(e, true);
+            }, null, null, this.token);
         };
     
         EventData.prototype.reject = function (value, synchronous) {
-            if (this.closed) {
+            if (this.state > EventState.sending) {
                 return;
+            }
+    
+            if (!this.pending) {
+                this.pending = {};
             }
     
             this.state = EventState.rejected;
-            this.fault = value;
-            this.closed = true;
-    
-            if (this.token && this.cancellationHandle) {
-                this.token.unregister(this.cancellationHandle);
-                this.token = null;
-                this.cancellationHandle = null;
-            }
-    
-            this.process(this.rejectCallbacks, value, true, synchronous);
+            linkedlist.Append(this.pending, { kind: EventState.rejected, value: value });
+            this.processPending(synchronous);
         };
     
         EventData.prototype.close = function (synchronous) {
-            if (this.closed) {
+            if (this.state > EventState.sending) {
                 return;
+            }
+    
+            if (!this.pending) {
+                this.pending = {};
             }
     
             this.state = EventState.closed;
-            this.closed = true;
-    
-            if (this.token && this.cancellationHandle) {
-                this.token.unregister(this.cancellationHandle);
-                this.token = null;
-                this.cancellationHandle = null;
-            }
-    
-            this.process(this.closeCallbacks, void 0, true, synchronous);
+            linkedlist.Append(this.pending, { kind: EventState.closed });
+            this.processPending(synchronous);
         };
     
         EventData.prototype.cancel = function () {
-            if (this.closed) {
+            if (this.state > EventState.sending) {
                 return;
             }
     
-            this.state = EventState.canceled;
-            this.closed = true;
-    
-            if (this.token && this.cancellationHandle) {
-                this.token.unregister(this.cancellationHandle);
-                this.token = null;
-                this.cancellationHandle = null;
+            if (!this.pending) {
+                this.pending = {};
             }
     
-            this.process(this.cancelCallbacks, void 0, true, true);
+            this.state = EventState.canceled;
+            this.pending.head = null;
+            linkedlist.Append(this.pending, { kind: EventState.canceled });
+            this.processPending(true);
         };
     
         EventData.prototype.append = function (receiveCallback, rejectCallback, closeCallback, cancelCallback, token) {
             var _this = this;
             if (!(token && token.canceled)) {
                 if (typeof receiveCallback === "function") {
-                    if (this.receiveCallbacks == null) {
-                        this.receiveCallbacks = {};
+                    if (this.resolveCallbacks == null) {
+                        this.resolveCallbacks = {};
                     }
     
-                    var receiveNode = linkedlist.Append(this.receiveCallbacks, {
+                    var receiveNode = linkedlist.Append(this.resolveCallbacks, {
                         token: token,
                         callback: receiveCallback
                     });
     
                     if (token) {
                         token.register(function () {
-                            linkedlist.Delete(_this.receiveCallbacks, receiveNode);
+                            linkedlist.Delete(_this.resolveCallbacks, receiveNode);
                         });
                     }
                 }
@@ -895,22 +878,50 @@
                 }
             }
     
-            if (this.receiveCallbacks && this.pending) {
-                var pending = this.pending;
-                this.pending = null;
-                this.state = EventState.sending;
-                while (pending.length) {
-                    this.process(this.receiveCallbacks, pending.shift(), false, false);
-                }
-            }
+            this.processPending(false);
+        };
     
-            if (this.state === EventState.sending) {
-            } else if (this.state === EventState.rejected) {
-                this.process(this.rejectCallbacks, this.fault, true, false);
-            } else if (this.state === EventState.closed) {
-                this.process(this.closeCallbacks, void 0, true, false);
-            } else if (this.state === EventState.canceled) {
-                this.process(this.cancelCallbacks, void 0, true, true);
+        EventData.prototype.processPending = function (synchronous) {
+            if (this.pending && (this.resolveCallbacks || this.rejectCallbacks || this.closeCallbacks || this.cancelCallbacks)) {
+                var node;
+                while (node = this.pending.head) {
+                    if (node.kind === EventState.pending) {
+                        return;
+                    }
+    
+                    if (this.state <= EventState.sending && node.kind > EventState.sending) {
+                        if (this.token && this.cancellationHandle) {
+                            this.token.unregister(this.cancellationHandle);
+                            this.token = null;
+                            this.cancellationHandle = null;
+                        }
+    
+                        node.next = node;
+                        node.prev = node;
+                    }
+    
+                    this.state = node.kind;
+    
+                    switch (node.kind) {
+                        case EventState.sending:
+                            linkedlist.Delete(this.pending, node);
+                            this.process(this.resolveCallbacks, node.value, false, synchronous);
+                            synchronous = false;
+                            break;
+    
+                        case EventState.rejected:
+                            this.process(this.rejectCallbacks, node.value, false, synchronous);
+                            return;
+    
+                        case EventState.closed:
+                            this.process(this.closeCallbacks, void 0, true, synchronous);
+                            return;
+    
+                        case EventState.canceled:
+                            this.process(this.cancelCallbacks, void 0, true, true);
+                            return;
+                    }
+                }
             }
         };
     
@@ -926,11 +937,7 @@
     
                         var callback = node.value.callback, token = node.value.token;
                         if (!(token && token.canceled)) {
-                            futures.Scheduler.current.post((function (callback) {
-                                return function () {
-                                    callback(result);
-                                };
-                            })(callback), { synchronous: synchronous }, token);
+                            futures.Scheduler.current.post(callback.bind(null, result), { synchronous: synchronous }, token);
                         }
     
                         node = next;
@@ -947,10 +954,11 @@
     var EventState;
     (function (EventState) {
         EventState[EventState["pending"] = 0] = "pending";
-        EventState[EventState["sending"] = 1] = "sending";
-        EventState[EventState["rejected"] = 2] = "rejected";
-        EventState[EventState["closed"] = 3] = "closed";
+        EventState[EventState["queuing"] = 1] = "queuing";
+        EventState[EventState["sending"] = 2] = "sending";
+        EventState[EventState["rejected"] = 3] = "rejected";
+        EventState[EventState["closed"] = 4] = "closed";
     
-        EventState[EventState["canceled"] = 4] = "canceled";
+        EventState[EventState["canceled"] = 5] = "canceled";
     })(EventState || (EventState = {}));
 }, this);

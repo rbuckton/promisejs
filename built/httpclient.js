@@ -233,8 +233,8 @@
             return new Uri(uri);
         };
     
-        Uri.combine = function (baseUriAny, uriAny) {
-            return new Uri(baseUriAny, uriAny);
+        Uri.combine = function (baseUri, uri) {
+            return new Uri(baseUri, uri);
         };
         return Uri;
     })();

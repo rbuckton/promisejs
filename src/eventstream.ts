@@ -8,7 +8,7 @@ import futures = module("futures");
 
 module linkedlist {
     export function Append(list: { head?; }, node: any): any {
-        if (node && !node.next && !node.list) {
+        if (node && !node.next) {
             if (list.head) {
                 var pos = list.head.prev;
                 node.prev = pos;
@@ -21,15 +21,13 @@ module linkedlist {
                 node.prev = node;
                 list.head = node;
             }
-
-            node.list = list;
         }
 
         return node;
     }
 
     export function Delete(list: { head?; }, node: any): any {
-        if (node && node.next && node.list === list) {
+        if (node && node.next) {
             if (node.next !== node) {
                 node.next.prev = node.prev;
                 node.prev.next = node.next;
@@ -44,7 +42,7 @@ module linkedlist {
                 }
             }
             
-            node.list = node.prev = node.next = null;
+            node.prev = node.next = null;
         }
 
         return node;
@@ -96,41 +94,21 @@ export class EventSource<T> {
     /** Sends a value to a subscriber.
       * @param value The value to send
       */
-    public send(value: T): void;
+    public resolve(value: T): void;
 
     /** Sends a future value to a subscriber.
       * @param value The value to send
       */
-    public send(value: futures.Future<T>): void;
-    public send(value: any): void {
-        this._eventData.send(value);
+    public resolve(value: futures.Future<T>, token?: futures.CancellationToken): void;
+    public resolve(value: any, token?: futures.CancellationToken): void {
+        this._eventData.resolve(value, token);
     }
-
-    /** Sends a value to a subscriber
-      * @param value The value to stream
-      */
-    public stream(value: T): void;
-
-    /** Sends a future value to a subscriber
-      * @param value The value to stream
-      */
-    public stream(value: futures.Future<T>): void;
-
-    /** Sends the contents of a future stream to this stream's subscribers
-      * @param value The values to stream
-      */
-    public stream(value: futures.Future<EventStream<T>>): void;
 
     /** Sends the contents of an event stream to this stream's subscribers
       * @param value The values to stream
       */
-    public stream(value: EventStream<T>): void;
-
-    /** Sends a value to a subscriber. If the value is a Future, its future result or error is sent. If the value is an EventStream, its receive and reject events are sent.
-      * @param value The value to send
-      */
-    public stream(value: any): void {
-        this._eventData.send(value);
+    public merge(value: EventStream<T>, token?: futures.CancellationToken): void {
+        this._eventData.merge(value, token);
     }
 
     /** Sends a rejection to the subscriber
@@ -154,10 +132,10 @@ export class EventSource<T> {
 }
 
 // TODO: should this buffer??
-/** A stream of events
-  */
+/** 
+ * A stream of events
+ */
 export class EventStream<T> {    
-
     private _eventData: EventData;
 
     /** 
@@ -181,7 +159,7 @@ export class EventStream<T> {
         var source: EventSource<T> = Object.create(EventSource.prototype);
         var data = new EventData<T>(this, source, token);
         source.accept = source.accept.bind(source);
-        source.send = source.send.bind(source);
+        source.resolve = source.resolve.bind(source);
         source.reject = source.reject.bind(source);
         source.close = source.close.bind(source);
 
@@ -275,7 +253,7 @@ export class EventStream<T> {
             this.listen(
                 value => { 
                     try {
-                        source.send(projection.call(thisArg, value, index++, this)); 
+                        source.resolve(projection.call(thisArg, value, index++, this), cts.token); 
                     } 
                     catch (e) {
                         source.reject(e);
@@ -612,7 +590,7 @@ export class EventStream<T> {
                     try {
                         done = done || !predicate.call(thisArg, value, index++, this);
                         if (done) {
-                            source.send(value);
+                            source.accept(value);
                         }
                     }
                     catch (e) {
@@ -636,7 +614,7 @@ export class EventStream<T> {
                 value => {
                     try {
                         if (predicate.call(thisArg, value, index++, this)) {
-                            source.send(value);
+                            source.accept(value);
                         }
                         else {
                             source.close();
@@ -673,7 +651,7 @@ export class EventStream<T> {
             this.listen(
                 value => {
                     if (done) {
-                        source.send(value);
+                        source.accept(value);
                     }
                 },
                 e => {
@@ -738,7 +716,7 @@ export class EventStream<T> {
                     else {
                         try {
                             var result = projection.call(thisArg, value, right.shift(), index++, this, other);
-                            source.send(result);
+                            source.accept(result);
                         }
                         catch (e) {
                             source.reject(e);
@@ -765,7 +743,7 @@ export class EventStream<T> {
                     else {
                         try {
                             var result = projection.call(thisArg, left.shift(), value, index++, this, other);
-                            source.send(result);
+                            source.accept(result);
                         }
                         catch (e) {
                             source.reject(e);
@@ -870,13 +848,11 @@ export class EventStream<T> {
 class EventData {
     public events: EventStream;
     public source: EventSource;
-    public pending: any[];
-    public fault: any;
-    public closed: boolean = false;
-    public receiveCallbacks: { head?; };
+    public resolveCallbacks: { head?; };
     public rejectCallbacks: { head?; };
     public closeCallbacks: { head?; };
     public cancelCallbacks: { head?; };
+    public pending: { head?; };
     public state: EventState = EventState.pending;
     public token: futures.CancellationToken;
     public cancellationHandle: number;
@@ -884,6 +860,7 @@ class EventData {
     constructor(events: EventStream, source: EventSource, token: futures.CancellationToken) {
         Object.defineProperty(events, "_eventData", { value: this });
         Object.defineProperty(source, "_eventData", { value: this });
+
         this.events = events;
         this.source = source;
         this.token = token;
@@ -897,34 +874,50 @@ class EventData {
     }
 
     public accept(value: any, synchronous?: boolean): void {
-        if (this.closed) {
+        if (this.state > EventState.sending) {
             return;
         }
 
-        if (this.state === EventState.pending) {
-            if (!this.pending) {
-                this.pending = [];
-            }
-
-            this.pending.push(value);
+        if (!this.pending) {
+            this.pending = {};
         }
-        else {
-            this.process(this.receiveCallbacks, value, /*remove:*/ false, synchronous);
-        }
+        
+        this.state = EventState.sending;
+        linkedlist.Append(this.pending, { kind: EventState.sending, value: value });
+        
+        this.processPending(synchronous);
     }
 
-    public send(value: any, synchronous?: boolean): void {
-        if (this.closed) {
+    public resolve(value: any, token: futures.CancellationToken, synchronous?: boolean): void {
+        if (this.state > EventState.sending) {
             return;
         }
 
         if (futures.Future.isFuture(value)) {
+            var cts = new futures.CancellationSource(this.token, token);
+            if (!this.pending) {
+                this.pending = {};
+            }
+            
+            this.state = EventState.sending;
+            var node = linkedlist.Append(this.pending, { kind: EventState.pending });
             var future = <futures.Future>value;
-            var resolve = value => { this.accept(value, true); };
-            var reject = value => { this.reject(value, true); };
+            var resolve = value => {
+                if (this.state === EventState.canceled) return;
+                node.value = value;
+                node.kind = EventState.sending;
+                this.processPending(/*synchronous:*/ true);
+            };
+            var reject = value => {
+                if (this.state === EventState.canceled) return; 
+                node.value = value;
+                node.kind = EventState.rejected;
+                this.state = EventState.rejected;                
+                this.processPending(/*synchronous:*/ true);
+            };
 
             try {
-                value.done(resolve, reject);
+                value.done(resolve, reject, null, cts.token);
             }
             catch (e) {
                 this.reject(e, synchronous);
@@ -936,100 +929,78 @@ class EventData {
         this.accept(value, synchronous);
     }
 
-    public stream(value: any, synchronous: bool): void {
-        if (this.closed) {
-            return;
-        }
-
-        if (EventStream.isEventStream(value)) {
-            var events = <EventStream>value;
-            if (events === this.events) {
-                throw new TypeError("EventStream cannot stream itself");
-            }
-
-            var receive = value => { this.accept(value, true); };
-            var reject = value => { this.reject(value, true); };
-            try {
-                events.listen(receive, reject, null, null, this.token);
-            }
-            catch (e) {
-                this.reject(e, synchronous);
-            }
-
-            return;            
-        }
-
-        this.send(value, synchronous);
+    public merge(stream: EventStream, token: futures.CancellationToken): void {
+        stream.listen(
+            value => {
+                this.accept(value, true);
+            },
+            e => {
+                this.reject(e, true);
+            },
+            null,
+            null,
+            this.token);
     }
 
     public reject(value: any, synchronous?: boolean): void {
-        if (this.closed) {
+        if (this.state > EventState.sending) {
             return;
+        }
+
+        if (!this.pending) {
+            this.pending = {};
         }
 
         this.state = EventState.rejected;
-        this.fault = value;
-        this.closed = true;
-
-        if (this.token && this.cancellationHandle) {
-            this.token.unregister(this.cancellationHandle);
-            this.token = null;
-            this.cancellationHandle = null;
-        }
-
-        this.process(this.rejectCallbacks, value, /*remove:*/ true, synchronous);
+        linkedlist.Append(this.pending, { kind: EventState.rejected, value: value });
+        this.processPending(synchronous);
     }
 
     public close(synchronous?: boolean): void {
-        if (this.closed) {
+        if (this.state > EventState.sending) {
             return;
+        }
+
+        if (!this.pending) {
+            this.pending = {};
         }
 
         this.state = EventState.closed;
-        this.closed = true;
-
-        if (this.token && this.cancellationHandle) {
-            this.token.unregister(this.cancellationHandle);
-            this.token = null;
-            this.cancellationHandle = null;
-        }
-
-        this.process(this.closeCallbacks, void 0, /*remove:*/ true, synchronous);
+        linkedlist.Append(this.pending, { kind: EventState.closed });
+        this.processPending(synchronous);
     }
 
     public cancel(): void {
-        if (this.closed) {
+        if (this.state > EventState.sending) {
             return;
         }
 
-        this.state = EventState.canceled;
-        this.closed = true;
-
-        if (this.token && this.cancellationHandle) {
-            this.token.unregister(this.cancellationHandle);
-            this.token = null;
-            this.cancellationHandle = null;
+        if (!this.pending) {
+            this.pending = {};
         }
 
-        this.process(this.cancelCallbacks, void 0, /*remove:*/ true, /*synchronous:*/ true);
+        this.state = EventState.canceled;
+        this.pending.head = null;
+        linkedlist.Append(this.pending, { kind: EventState.canceled });
+        this.processPending(/*synchronous:*/ true);
     }
 
     public append(receiveCallback: (value: any) => void, rejectCallback: (value: any) => void, closeCallback: () => void, cancelCallback: () => void, token: futures.CancellationToken): void {
         
         if (!(token && token.canceled)) {
             if (typeof receiveCallback === "function") {
-                if (this.receiveCallbacks == null) {
-                    this.receiveCallbacks = {};
+                if (this.resolveCallbacks == null) {
+                    this.resolveCallbacks = {};
                 }
 
-                var receiveNode = linkedlist.Append(this.receiveCallbacks, {
+                var receiveNode = linkedlist.Append(this.resolveCallbacks, {
                     token: token,
                     callback: receiveCallback
                 });
                 
                 if (token) {
                     token.register(() => {
-                        linkedlist.Delete(this.receiveCallbacks, receiveNode);
+                        linkedlist.Delete(this.resolveCallbacks, receiveNode);
                     });
                 }
             }
@@ -1075,38 +1046,60 @@ class EventData {
             }
         }
 
-        // process any pending sends before processing reject/close
-        if (this.receiveCallbacks && this.pending) {
-            var pending = this.pending;
-            this.pending = null;
-            this.state = EventState.sending;
-            while (pending.length) {
-                this.process(this.receiveCallbacks, pending.shift(), /*remove:*/ false, /*synchronous:*/ false);
-            }            
-        }
+        this.processPending(/*synchronous:*/ false);
+    }
 
-        if (this.state === EventState.sending) {
-            // TODO: send events? Only if we're queuing them, not sure if that's the right design yet.
-        }
-        else if (this.state === EventState.rejected) {
-            this.process(this.rejectCallbacks, this.fault, /*remove:*/ true, /*synchronous:*/ false);
-        }
-        else if (this.state === EventState.closed) {
-            this.process(this.closeCallbacks, void 0, /*remove:*/ true, /*synchronous:*/ false);
-        }
-        else if (this.state === EventState.canceled) {
-            this.process(this.cancelCallbacks, void 0, /*remove:*/ true, /*synchronous:*/ true);
+    public processPending(synchronous: boolean): void {
+        if (this.pending && (this.resolveCallbacks || this.rejectCallbacks || this.closeCallbacks || this.cancelCallbacks)) {
+            
+            var node;
+            while (node = this.pending.head) {
+                if (node.kind === EventState.pending) {
+                    return;
+                }
+
+                // check for a transition to a closed state
+                if (this.state <= EventState.sending && 
+                    node.kind > EventState.sending) {
+
+                    // remove any cancellation logic
+                    if (this.token && this.cancellationHandle) {
+                        this.token.unregister(this.cancellationHandle);
+                        this.token = null;
+                        this.cancellationHandle = null;
+                    }
+
+                    // clear any nodes that follow this node, leaving it as the sole entry
+                    node.next = node;
+                    node.prev = node;
+                }
+
+                // ensure we're in the right state
+                this.state = node.kind;
+
+                switch (node.kind) {
+                    case EventState.sending:
+                        linkedlist.Delete(this.pending, node);
+                        this.process(this.resolveCallbacks, node.value, /*remove:*/ false, synchronous);
+                        synchronous = false;
+                        break;
+
+                    case EventState.rejected:
+                        this.process(this.rejectCallbacks, node.value, /*remove:*/ false, synchronous);                        
+                        return;
+
+                    case EventState.closed:
+                        this.process(this.closeCallbacks, void 0, /*remove:*/ true, synchronous);
+                        return;
+
+                    case EventState.canceled:
+                        this.process(this.cancelCallbacks, void 0, /*remove:*/ true, /*synchronous:*/ true);
+                        return;
+                }
+            }
         }
     }
 
-    /** processes callbacks
-      * @param callbacks The callbacks to process
-      * @param result The result to pass to the callbacks
-      * @param remove A value indicating whether to remove each processed callback
-      * @param synchronous A value indicating whether to process the callbacks synchronously
-      *
-      * @link http://dom.spec.whatwg.org/#concept-future-process
-      */
     public process(callbacks: { head?; }, result: any, remove: boolean, synchronous: boolean): void {
         if (callbacks) {
             var node = callbacks.head;
@@ -1120,7 +1113,10 @@ class EventData {
                     var callback = node.value.callback, token = node.value.token;
                     if (!(token && token.canceled)) { 
                         // execute either synchronously or as a microtask at the end of the turn
-                        futures.Scheduler.current.post(((callback) => () => { callback(result); })(callback), { synchronous: synchronous }, token);
+                        futures.Scheduler.current.post(
+                            callback.bind(null, result), 
+                            { synchronous: synchronous }, 
+                            token);
                     }
                     
                     node = next;
@@ -1138,6 +1134,7 @@ class EventData {
  */
 enum EventState {
     pending,
+    queuing,
     sending,
     rejected,
     closed,
