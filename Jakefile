@@ -11,36 +11,12 @@ directory("built");
 
 var dirs = ["obj", "built"];
 
-var symbols = {
-    target: "built/symbols.js",
-    inputs: ["src/symbols.ts"],
-    outputs: ["built/symbols.js"],
-    opts: opts,
-    deps: [dirs, "Jakefile", "src/umd.js"]
-};
-
-var lists = {
-    target: "built/lists.js",
-    inputs: ["src/lists.ts"],
-    outputs: ["built/lists.js"],
-    opts: opts,
-    deps: [symbols]
-};
-
-var tasks = {
-    target: "built/tasks.js",
-    inputs: ["src/tasks.ts"],
-    outputs: ["built/tasks.js"],
-    opts: opts,
-    deps: [symbols, lists]
-};
-
 var futures = {
     target: "built/futures.js",
     inputs: ["src/futures.ts"],
     outputs: ["built/futures.js"],
     opts: opts,
-    deps: [symbols, lists, tasks]
+    deps: []
 };
 
 var eventstream = {
@@ -48,7 +24,7 @@ var eventstream = {
     inputs: ["src/eventstream.ts"],
     outputs: ["built/eventstream.js"],
     opts: opts,
-    deps: [symbols, lists, tasks, futures]
+    deps: [futures]
 };
 
 var httpclient = {
@@ -56,7 +32,7 @@ var httpclient = {
     inputs: ["src/httpclient.ts"],
     outputs: ["built/httpclient.js"],
     opts: opts,
-    deps: [symbols, lists, tasks, futures]
+    deps: [futures]
 };
 
 var tests = {
@@ -64,7 +40,7 @@ var tests = {
     inputs: ["src/tests.ts"],
     outputs: ["built/tests.js"],
     opts: opts,
-    deps: [symbols, lists, tasks, futures, httpclient]
+    deps: [futures]
 }
 
 var promisejs = {
@@ -72,15 +48,12 @@ var promisejs = {
     inputs: ["src/promisejs.ts"],
     outputs: ["built/promisejs.js"],
     opts: { module: "commonjs", obj: "obj", experimental: true, comments: true },
-    deps: [symbols, lists, tasks, futures, httpclient]
+    deps: [futures, httpclient]
 }
 
 var modules = [
-    symbols,
-    lists,
-    tasks,
     futures,
-    //eventstream, 
+    eventstream, 
     httpclient, 
     promisejs,
     tests
@@ -199,49 +172,57 @@ function tsc(target, prereqs, sources, options) {
             tsc = spawn("cmd", ["/c", cmd], { stdio: "inherit" });
             
         tsc.on("exit", function (code) {
-            if (code == 0) {                
+            if (code == 0) {
                 if (/^umd$/i.test(options.module)) {
-                    
-                    // get the name of the module from its filename
-                    var targetId = trimExtension(target);
-                    var umd = copy({ }, options.umd);                
-                    
-                    // read the source
-                    var targetSrc = fs.readFileSync("obj/" + path.basename(target)).toString();
-                    
-                    // find the imports
-                    var imports = [];
-                    var re = /^\s*var\s+([a-z0-9_$]+)\s*=\s*require\s*\(\s*((['"])[[a-z0-9_\.\\\/ ]+\3)\s*\)\s*/gi;
-                    var m;
-                    while (m = re.exec(targetSrc)) {
-                        imports.push(m[2]);
+                    try {
+                        // get the name of the module from its filename
+                        var targetId = trimExtension(target);
+                        var umd = copy({ }, options.umd);                
+                        
+                        // read the source
+                        var targetSrc = fs.readFileSync("obj/" + path.basename(target)).toString();
+                        
+                        // find the imports
+                        var imports = [];
+                        var re = /^\s*var\s+([a-z0-9_$]+)\s*=\s*require\s*\(\s*((['"])[[a-z0-9_\.\\\/ ]+\3)\s*\)\s*/gi;
+                        var m;
+                        while (m = re.exec(targetSrc)) {
+                            imports.push(m[2]);
+                        }
+                        
+                        // load the umd template
+                        var umdSrc = fs.readFileSync("src/umd.js").toString();
+                        
+                        // transform the template
+                        var finalSrc = umdSrc.replace(/\${(\w+)}/gi, function (_, id) {
+                            if (id === "imports") {
+                                return imports.length ? ", " + imports.join(", ") : "";
+                            }
+                            else if (id === "content") {
+                                return targetSrc.split(/\r\n|\n/).join("\r\n    ").trim();
+                            }
+                            else if (id === "id") {
+                                return targetId;
+                            }
+                            return "";
+                        });
+                        
+                        // write the file
+                        fs.writeFileSync(target, finalSrc);
                     }
-                    
-                    // load the umd template
-                    var umdSrc = fs.readFileSync("src/umd.js").toString();
-                    
-                    // transform the template
-                    var finalSrc = umdSrc.replace(/\${(\w+)}/gi, function (_, id) {
-                        if (id === "imports") {
-                            return imports.length ? ", " + imports.join(", ") : "";
-                        }
-                        else if (id === "content") {
-                            return targetSrc.split(/\r\n|\n/).join("\r\n    ").trim();
-                        }
-                        else if (id === "id") {
-                            return targetId;
-                        }
-                        return "";
-                    });
-                    
-                    // write the file
-                    fs.writeFileSync(target, finalSrc);                
+                    catch (e) {
+                        console.error(e);
+                        fail();
+                    }
                 }
                 else if (options.obj) {
                     fs.renameSync(path.join(options.obj, path.basename(target)), target);
                 }
+                complete();
             }
-            complete();
+            else {
+                fail();
+            }
         });
     });
 }

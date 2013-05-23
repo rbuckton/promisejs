@@ -120,6 +120,9 @@
             CancellationDataSym.set(token, data);
             CancellationDataSym.set(this, data);
     
+            this.cancel = this.cancel.bind(this);
+            this.cancelAfter = this.cancelAfter.bind(this);
+    
             tokens.forEach(function (token) {
                 if (symbols.hasBrand(token, CancellationToken)) {
                     LinkToCancellationToken(data, token);

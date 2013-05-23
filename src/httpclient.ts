@@ -4,9 +4,6 @@
  * https://github.com/rbuckton/promisejs/raw/master/LICENSE
  * 
  */
-import symbols = module("symbols");
-import lists = module("lists");
-import tasks = module("tasks");
 import futures = module("futures");
 
 /**
@@ -112,8 +109,8 @@ export class Uri {
             this.absolute = !!m[1];         
         }
         else {
-            var baseUri: Uri = symbols.hasBrand(args[0], Uri) ? args[0] : Uri.parse(args[0]);
-            var uri: Uri = symbols.hasBrand(args[1], Uri) ? args[1] : Uri.parse(args[1]);           
+            var baseUri: Uri = args[0] instanceof Uri ? args[0] : Uri.parse(args[0]);
+            var uri: Uri = args[0] instanceof Uri ? args[1] : Uri.parse(args[1]);
             if (uri.absolute) {         
                 this.protocol = uri.protocol;
                 this.hostname = uri.hostname;
@@ -194,7 +191,7 @@ export class Uri {
     public isSameOrigin(uri: string): boolean;
 
     public isSameOrigin(uriAny: any): boolean {
-        var uri: Uri = symbols.hasBrand(uriAny, Uri) ? uriAny : Uri.parse(String(uriAny));
+        var uri: Uri = uriAny instanceof Uri ? uriAny : Uri.parse(String(uriAny));
         if (this.absolute) {
             return this.origin === uri.origin;
         }
@@ -346,12 +343,11 @@ export class Uri {
     }
 }
 
-symbols.brand("Uri")(Uri);
-
 /**
  * An HTTP request for an HttpClient
  */
 export class HttpRequest {
+    private _headers: { [key: string]: string; };
 
     /**
      * The body of the request   
@@ -373,29 +369,23 @@ export class HttpRequest {
 
     /**
      * Creates an HTTP request for an HttpClient
-     */
-    constructor();
-
-    /**
-     * Creates an HTTP request for an HttpClient
      * @param method {String} The HTTP method for the request
      * @param url {String} The url for the request
      */
-    constructor(method: string, url: string);
+    constructor(method?: string, url?: string);
 
     /**
      * Creates an HTTP request for an HttpClient
      * @param method {String} The HTTP method for the request
      * @param url {Uri} The url for the request
      */
-    constructor(method: string, url: Uri);
+    constructor(method?: string, url?: Uri);
 
     constructor(method: string = "GET", urlAny: any = null) {
-        var data = new lists.Map<string, string>();
-        HttpRequestDataSym.set(this, data);
+        Object.defineProperty(this, "_headers", { value: Object.create(null) });
         this.method = method;
         if (urlAny) {
-            this.url = symbols.hasBrand(urlAny, Uri) ? urlAny : Uri.parse(urlAny);
+            this.url = urlAny instanceof Uri ? urlAny : Uri.parse(urlAny);
         }
     }
 
@@ -405,65 +395,53 @@ export class HttpRequest {
      * @param value {String} The header value
      */
     public setRequestHeader(key: string, value: string): void {
-        var data = HttpRequestDataSym.get(this);
-        if (!data || !symbols.hasBrand(this, HttpRequest)) throw new TypeError("'this' is not an HttpRequest object");
-
-        data.set(key, value);
+        if (key !== "__proto__") {
+            this._headers[key] = value;
+        }
     }
 }
-
-symbols.brand("HttpRequest")(HttpRequest);
 
 /**
  * A response from an HttpClient
  */
 export class HttpResponse {
+    private _request: HttpRequest;
+    private _xhr: XMLHttpRequest;
 
     /**
      * A response from an HttpClient
      */
-    constructor() {
-        throw new Error("Object doesn't support this action;");
+    constructor(request: HttpRequest, xhr: XMLHttpRequest) {
+        this._request = request;
+        this._xhr = xhr;
     }
 
     /**
      * Gets the request for this response
      */
     public get request(): HttpRequest {
-        var data = HttpResponseDataSym.get(this);
-        if (!data || !symbols.hasBrand(this, HttpResponse)) throw new TypeError("'this' is not an HttpResponse object");
-
-        return data.request;
+        return this._request;
     }
 
     /**
      * Gets the status code of the response
      */
     public get status(): number {
-        var data = HttpResponseDataSym.get(this);
-        if (!data || !symbols.hasBrand(this, HttpResponse)) throw new TypeError("'this' is not an HttpResponse object");
-
-        return data.xhr.status;
+        return this._xhr.status;
     }
 
     /**
      * Gets the status text of the response
      */
     public get statusText(): string {
-        var data = HttpResponseDataSym.get(this);
-        if (!data || !symbols.hasBrand(this, HttpResponse)) throw new TypeError("'this' is not an HttpResponse object");
-
-        return data.xhr.statusText;
+        return this._xhr.statusText;
     }
 
     /**
      * Gets the response text of the response
      */
     public get responseText(): string {
-        var data = HttpResponseDataSym.get(this);
-        if (!data || !symbols.hasBrand(this, HttpResponse)) throw new TypeError("'this' is not an HttpResponse object");
-
-        return data.xhr.responseText;
+        return this._xhr.responseText;
     }
 
     /**
@@ -471,10 +449,7 @@ export class HttpResponse {
      * @returns {String} A string containing all of the response headers
      */
     public getAllResponseHeaders(): string {
-        var data = HttpResponseDataSym.get(this);
-        if (!data || !symbols.hasBrand(this, HttpResponse)) throw new TypeError("'this' is not an HttpResponse object");
-
-        return data.xhr.getAllResponseHeaders();
+        return this._xhr.getAllResponseHeaders();
     }
     
     /**
@@ -482,20 +457,19 @@ export class HttpResponse {
      * @param header {String} The name of the header
      * @returns {String} The value for the named header
      */
-    public getResponseHeader(header: string): string {      
-        var data = HttpResponseDataSym.get(this);
-        if (!data || !symbols.hasBrand(this, HttpResponse)) throw new TypeError("'this' is not an HttpResponse object");
-
-        return data.xhr.getResponseHeader(header);
+    public getResponseHeader(header: string): string {
+        return this._xhr.getResponseHeader(header);
     }
 }
-
-symbols.brand("HttpResponse")(HttpResponse);
 
 /**
  * A client for HTTP requests
  */
 export class HttpClient {
+
+    private _headers: { [key: string]: string; };
+    private _cts: futures.CancellationSource;
+    private _closed: boolean;
 
     /**
      * The base url for the client
@@ -529,27 +503,25 @@ export class HttpClient {
 
     /**
      * Creates a client for HTTP requests
-     */
-    constructor();
-
-    /**
-     * Creates a client for HTTP requests
      * @param baseUrl {String} The base url for the client
      */
-    constructor(baseUrl: string);
+    constructor(baseUrl?: string);
 
     /**
      * Creates a client for HTTP requests
      * @param baseUrl {Uri} The base url for the client
      */
-    constructor(baseUrl: Uri);
+    constructor(baseUrl?: Uri);
 
-    constructor(baseUrlAny?: any) {
-        var clientData = new HttpClientData();
-        HttpClientDataSym.set(this, clientData);
-        
-        if (baseUrlAny) {
-            this.baseUrl = symbols.hasBrand(baseUrlAny, Uri) ? baseUrlAny : Uri.parse(baseUrlAny);
+    constructor(baseUrl?: any) {
+        Object.defineProperties(this, {
+            _headers: { value: Object.create(null) },
+            _cts: { value: new futures.CancellationSource() },
+            _closed: { value: false, writable: true }
+        })
+                
+        if (baseUrl) {
+            this.baseUrl = baseUrl instanceof Uri ? baseUrl : Uri.parse(baseUrl);
         }
     }
 
@@ -557,13 +529,10 @@ export class HttpClient {
      * Closes the client and cancels all pending requests
      */
     public close(): void {
-        var data = HttpClientDataSym.get(this);
-        if (!data || !symbols.hasBrand(this, HttpClient)) throw new TypeError("'this' is not an HttpClient object");
-        if (data.closed) throw new Error("Object doesn't support this action");
-
-        data.closed = true;
-        data.cts.cancel();
-        data.cts.close();       
+        if (this._closed) throw new Error("Object doesn't support this action");
+        this._closed = true;
+        this._cts.cancel();
+        this._cts.close();       
     }
 
     /**
@@ -572,11 +541,10 @@ export class HttpClient {
      * @param value {String} The request header value
      */
     public setRequestHeader(key: string, value: string): void {
-        var data = HttpClientDataSym.get(this);
-        if (!data || !symbols.hasBrand(this, HttpClient)) throw new TypeError("'this' is not an HttpClient object");
-        if (data.closed) throw new Error("Object doesn't support this action");
-
-        data.headers.set(key, value);
+        if (this._closed) throw new Error("Object doesn't support this action");
+        if (key !== "__proto__") {
+            this._headers[key] = value;
+        }
     }
 
     /**
@@ -593,80 +561,50 @@ export class HttpClient {
      */
     public getStringAsync(url: Uri): futures.Future<string>;
 
-    public getStringAsync(urlAny: any): futures.Future<string> {
-        return this.getAsync(urlAny).then(r => r.responseText);
+    public getStringAsync(url: any): futures.Future<string> {
+        return this.getAsync(url).then(r => r.responseText);
     }
 
     /**
      * Gets the response from issuing an HTTP GET to the requested url
      * @param url {String} The url for the request
+     * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Future<HttpResponse>} A future result for the response
      */
-    public getAsync(url: string): futures.Future<HttpResponse>;
+    public getAsync(url: string, token?: futures.CancellationToken): futures.Future<HttpResponse>;
 
     /**
      * Gets the response from issuing an HTTP GET to the requested url
      * @param url {Uri} The url for the request
+     * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Future<HttpResponse>} A future result for the response
      */
-    public getAsync(url: Uri): futures.Future<HttpResponse>;
+    public getAsync(url: Uri, token?: futures.CancellationToken): futures.Future<HttpResponse>;
 
-    /**
-     * Gets the response from issuing an HTTP GET to the requested url
-     * @param url {String} The url for the request
-     * @param token {tasks.CancellationToken} A token that can be used to cancel the request
-     * @returns {futures.Future<HttpResponse>} A future result for the response
-     */
-    public getAsync(url: string, token: tasks.CancellationToken): futures.Future<HttpResponse>;
-
-    /**
-     * Gets the response from issuing an HTTP GET to the requested url
-     * @param url {Uri} The url for the request
-     * @param token {tasks.CancellationToken} A token that can be used to cancel the request
-     * @returns {futures.Future<HttpResponse>} A future result for the response
-     */
-    public getAsync(url: Uri, token: tasks.CancellationToken): futures.Future<HttpResponse>;
-
-    public getAsync(urlAny: any, token?: tasks.CancellationToken): futures.Future<HttpResponse> {
-        return this.sendAsync(new HttpRequest("GET", urlAny), token);
+    public getAsync(url: any, token?: futures.CancellationToken): futures.Future<HttpResponse> {
+        return this.sendAsync(new HttpRequest("GET", url), token);
     }
 
     /**
      * Gets the response from issuing an HTTP POST to the requested url
      * @param url {String} The url for the request
      * @param body {any} The body of the request
+     * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Future<HttpResponse>} A future result for the response
      */
-    public postAsync(url: string, body: any): futures.Future<HttpResponse>;
+    public postAsync(url: string, body: any, token?: futures.CancellationToken): futures.Future<HttpResponse>;
 
     /**
      * Gets the response from issuing an HTTP POST to the requested url
      * @param url {Uri} The url for the request
      * @param body {any} The body of the request
+     * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Future<HttpResponse>} A future result for the response
      */
-    public postAsync(url: Uri, body: any): futures.Future<HttpResponse>;
+    public postAsync(url: Uri, body: any, token?: futures.CancellationToken): futures.Future<HttpResponse>;
 
-    /**
-     * Gets the response from issuing an HTTP POST to the requested url
-     * @param url {String} The url for the request
-     * @param body {any} The body of the request
-     * @param token {tasks.CancellationToken} A token that can be used to cancel the request
-     * @returns {futures.Future<HttpResponse>} A future result for the response
-     */
-    public postAsync(url: string, body: any, token: tasks.CancellationToken): futures.Future<HttpResponse>;
-
-    /**
-     * Gets the response from issuing an HTTP POST to the requested url
-     * @param url {Uri} The url for the request
-     * @param body {any} The body of the request
-     * @param token {tasks.CancellationToken} A token that can be used to cancel the request
-     * @returns {futures.Future<HttpResponse>} A future result for the response
-     */
-    public postAsync(url: Uri, body: any, token: tasks.CancellationToken): futures.Future<HttpResponse>;
-
-    public postAsync(urlAny: any, body: any, token?: tasks.CancellationToken): futures.Future<HttpResponse> {
-        var request = new HttpRequest("POST", urlAny);
+    public postAsync(url: any, body: any, token?: futures.CancellationToken): futures.Future<HttpResponse> {
+        var request = new HttpRequest("POST", url);
         request.body = body;
         return this.sendAsync(request, token);
     }
@@ -675,122 +613,45 @@ export class HttpClient {
      * Gets the response from issuing an HTTP POST of a JSON serialized value to the requested url
      * @param url {String} The url for the request
      * @param value {any} The value to serialize
-     * @returns {futures.Future<HttpResponse>} A future result for the response
-     */
-    public postJsonAsync(url: string, value: any): futures.Future<HttpResponse>;
-
-    /**
-     * Gets the response from issuing an HTTP POST of a JSON serialized value to the requested url
-     * @param url {String} The url for the request
-     * @param value {any} The value to serialize
-     * @param token {tasks.CancellationToken} A token that can be used to cancel the request
-     * @returns {futures.Future<HttpResponse>} A future result for the response
-     */
-    public postJsonAsync(url: string, value: any, token: tasks.CancellationToken): futures.Future<HttpResponse>;
-
-    /**
-     * Gets the response from issuing an HTTP POST of a JSON serialized value to the requested url
-     * @param url {String} The url for the request
-     * @param value {any} The value to serialize
-     * @param token {tasks.CancellationToken} A token that can be used to cancel the request
-     * @returns {futures.Future<HttpResponse>} A future result for the response
-     */
-    public postJsonAsync(url: string, value: any, jsonReplacer: any[]): futures.Future<HttpResponse>;
-
-    /**
-     * Gets the response from issuing an HTTP POST of a JSON serialized value to the requested url
-     * @param url {String} The url for the request
-     * @param value {any} The value to serialize
      * @param jsonReplacer {any[]} An array of replacements for the JSON serializer
-     * @param token {tasks.CancellationToken} A token that can be used to cancel the request
+     * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Future<HttpResponse>} A future result for the response
      */
-    public postJsonAsync(url: string, value: any, jsonReplacer: any[], token: tasks.CancellationToken): futures.Future<HttpResponse>;
+    public postJsonAsync(url: string, value: any, jsonReplacer?: any[], token?: futures.CancellationToken): futures.Future<HttpResponse>;
 
     /**
      * Gets the response from issuing an HTTP POST of a JSON serialized value to the requested url
      * @param url {String} The url for the request
      * @param value {any} The value to serialize
      * @param jsonReplacer {Function} A callback used to replace values during serialization
+     * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Future<HttpResponse>} A future result for the response
      */
-    public postJsonAsync(url: string, value: any, jsonReplacer: (key: string, value: any) => any): futures.Future<HttpResponse>;
-
-    /**
-     * Gets the response from issuing an HTTP POST of a JSON serialized value to the requested url
-     * @param url {String} The url for the request
-     * @param value {any} The value to serialize
-     * @param jsonReplacer {Function} A callback used to replace values during serialization
-     * @param token {tasks.CancellationToken} A token that can be used to cancel the request
-     * @returns {futures.Future<HttpResponse>} A future result for the response
-     */
-    public postJsonAsync(url: string, value: any, jsonReplacer: (key: string, value: any) => any, token: tasks.CancellationToken): futures.Future<HttpResponse>;
-
-    /**
-     * Gets the response from issuing an HTTP POST of a JSON serialized value to the requested url
-     * @param url {String} The url for the request
-     * @param value {any} The value to serialize
-     * @returns {futures.Future<HttpResponse>} A future result for the response
-     */
-    public postJsonAsync(url: Uri, value: any): futures.Future<HttpResponse>;
-
-    /**
-     * Gets the response from issuing an HTTP POST of a JSON serialized value to the requested url
-     * @param url {String} The url for the request
-     * @param value {any} The value to serialize
-     * @param token {tasks.CancellationToken} A token that can be used to cancel the request
-     * @returns {futures.Future<HttpResponse>} A future result for the response
-     */
-    public postJsonAsync(url: Uri, value: any, token: tasks.CancellationToken): futures.Future<HttpResponse>;
+    public postJsonAsync(url: string, value: any, jsonReplacer?: (key: string, value: any) => any, token?: futures.CancellationToken): futures.Future<HttpResponse>;
 
     /**
      * Gets the response from issuing an HTTP POST of a JSON serialized value to the requested url
      * @param url {String} The url for the request
      * @param value {any} The value to serialize
      * @param jsonReplacer {any[]} An array of replacements for the JSON serializer
+     * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Future<HttpResponse>} A future result for the response
      */
-    public postJsonAsync(url: Uri, value: any, jsonReplacer: any[]): futures.Future<HttpResponse>;
-
-    /**
-     * Gets the response from issuing an HTTP POST of a JSON serialized value to the requested url
-     * @param url {String} The url for the request
-     * @param value {any} The value to serialize
-     * @param jsonReplacer {any[]} An array of replacements for the JSON serializer
-     * @param token {tasks.CancellationToken} A token that can be used to cancel the request
-     * @returns {futures.Future<HttpResponse>} A future result for the response
-     */
-    public postJsonAsync(url: Uri, value: any, jsonReplacer: any[], token: tasks.CancellationToken): futures.Future<HttpResponse>;
+    public postJsonAsync(url: Uri, value: any, jsonReplacer?: any[], token?: futures.CancellationToken): futures.Future<HttpResponse>;
 
     /**
      * Gets the response from issuing an HTTP POST of a JSON serialized value to the requested url
      * @param url {Uri} The url for the request
      * @param value {any} The value to serialize
      * @param jsonReplacer {Function} A callback used to replace values during serialization
+     * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Future<HttpResponse>} A future result for the response
      */
-    public postJsonAsync(url: Uri, value: any, jsonReplacer: (key: string, value: any) => any): futures.Future<HttpResponse>;
+    public postJsonAsync(url: Uri, value: any, jsonReplacer?: (key: string, value: any) => any, token?: futures.CancellationToken): futures.Future<HttpResponse>;
 
-    /**
-     * Gets the response from issuing an HTTP POST of a JSON serialized value to the requested url
-     * @param url {Uri} The url for the request
-     * @param value {any} The value to serialize
-     * @param jsonReplacer {Function} A callback used to replace values during serialization
-     * @param token {tasks.CancellationToken} A token that can be used to cancel the request
-     * @returns {futures.Future<HttpResponse>} A future result for the response
-     */
-    public postJsonAsync(url: Uri, value: any, jsonReplacer: (key: string, value: any) => any, token: tasks.CancellationToken): futures.Future<HttpResponse>;
-
-    public postJsonAsync(urlAny: any, value: any, ...args: any[]): futures.Future<HttpResponse> {
-        var argi = 0;
-        var jsonReplacerAny: any;
-        var token: tasks.CancellationToken;
-
-        if (typeof args[argi] === "function" || Array.isArray(args[argi])) jsonReplacerAny = args[argi++];
-        if (symbols.hasBrand(args[argi], tasks.CancellationToken)) token = args[argi];
-
-        var request = new HttpRequest("POST", urlAny);
-        request.body = JSON.stringify(value, jsonReplacerAny);
+    public postJsonAsync(url: any, value: any, jsonReplacer?, token?: futures.CancellationToken): futures.Future<HttpResponse> {
+        var request = new HttpRequest("POST", url);
+        request.body = JSON.stringify(value, jsonReplacer);
         request.setRequestHeader("Content-Type", "application/json");
         return this.sendAsync(request, token);
     }
@@ -799,39 +660,22 @@ export class HttpClient {
      * Gets the response from issuing an HTTP PUT to the requested url
      * @param url {String} The url for the request
      * @param body {any} The body of the request
-     * @param token {tasks.CancellationToken} A token that can be used to cancel the request
+     * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Future<HttpResponse>} A future result for the response
      */
-    public putAsync(url: string, body: any): futures.Future<HttpResponse>;
+    public putAsync(url: string, body: any, token?: futures.CancellationToken): futures.Future<HttpResponse>;
 
     /**
      * Gets the response from issuing an HTTP PUT to the requested url
      * @param url {Uri} The url for the request
      * @param body {any} The body of the request
+     * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Future<HttpResponse>} A future result for the response
      */
-    public putAsync(url: Uri, body: any): futures.Future<HttpResponse>;
+    public putAsync(url: Uri, body: any, token?: futures.CancellationToken): futures.Future<HttpResponse>;
 
-    /**
-     * Gets the response from issuing an HTTP PUT to the requested url
-     * @param url {String} The url for the request
-     * @param body {any} The body of the request
-     * @param token {tasks.CancellationToken} A token that can be used to cancel the request
-     * @returns {futures.Future<HttpResponse>} A future result for the response
-     */
-    public putAsync(url: string, body: any, token: tasks.CancellationToken): futures.Future<HttpResponse>;
-
-    /**
-     * Gets the response from issuing an HTTP PUT to the requested url
-     * @param url {Uri} The url for the request
-     * @param body {any} The body of the request
-     * @param token {tasks.CancellationToken} A token that can be used to cancel the request
-     * @returns {futures.Future<HttpResponse>} A future result for the response
-     */
-    public putAsync(url: Uri, body: any, token: tasks.CancellationToken): futures.Future<HttpResponse>;
-
-    public putAsync(urlAny: any, body: any, token?: tasks.CancellationToken): futures.Future<HttpResponse> {
-        var request = new HttpRequest("PUT", urlAny);
+    public putAsync(url: any, body: any, token?: futures.CancellationToken): futures.Future<HttpResponse> {
+        var request = new HttpRequest("PUT", url);
         request.body = body;
         return this.sendAsync(request, token);
     }
@@ -840,122 +684,45 @@ export class HttpClient {
      * Gets the response from issuing an HTTP PUT of a JSON serialized value to the requested url
      * @param url {Uri} The url for the request
      * @param value {any} The value to serialize
-     * @returns {futures.Future<HttpResponse>} A future result for the response
-     */
-    public putJsonAsync(url: string, value: any): futures.Future<HttpResponse>;
-
-    /**
-     * Gets the response from issuing an HTTP PUT of a JSON serialized value to the requested url
-     * @param url {Uri} The url for the request
-     * @param value {any} The value to serialize
-     * @param token {tasks.CancellationToken} A token that can be used to cancel the request
-     * @returns {futures.Future<HttpResponse>} A future result for the response
-     */
-    public putJsonAsync(url: string, value: any, token: tasks.CancellationToken): futures.Future<HttpResponse>;
-
-    /**
-     * Gets the response from issuing an HTTP PUT of a JSON serialized value to the requested url
-     * @param url {Uri} The url for the request
-     * @param value {any} The value to serialize
      * @param jsonReplacer {any[]} An array of replacements for the JSON serializer
+     * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Future<HttpResponse>} A future result for the response
      */
-    public putJsonAsync(url: string, value: any, jsonReplacer: any[]): futures.Future<HttpResponse>;
-
-    /**
-     * Gets the response from issuing an HTTP PUT of a JSON serialized value to the requested url
-     * @param url {Uri} The url for the request
-     * @param value {any} The value to serialize
-     * @param jsonReplacer {any[]} An array of replacements for the JSON serializer
-     * @param token {tasks.CancellationToken} A token that can be used to cancel the request
-     * @returns {futures.Future<HttpResponse>} A future result for the response
-     */
-    public putJsonAsync(url: string, value: any, jsonReplacer: any[], token: tasks.CancellationToken): futures.Future<HttpResponse>;
+    public putJsonAsync(url: string, value: any, jsonReplacer?: any[], token?: futures.CancellationToken): futures.Future<HttpResponse>;
 
     /**
      * Gets the response from issuing an HTTP PUT of a JSON serialized value to the requested url
      * @param url {String} The url for the request
      * @param value {any} The value to serialize
      * @param jsonReplacer {Function} A callback used to replace values during serialization
+     * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Future<HttpResponse>} A future result for the response
      */
-    public putJsonAsync(url: string, value: any, jsonReplacer: (key: string, value: any) => any): futures.Future<HttpResponse>;
-
-    /**
-     * Gets the response from issuing an HTTP PUT of a JSON serialized value to the requested url
-     * @param url {String} The url for the request
-     * @param value {any} The value to serialize
-     * @param jsonReplacer {Function} A callback used to replace values during serialization
-     * @param token {tasks.CancellationToken} A token that can be used to cancel the request
-     * @returns {futures.Future<HttpResponse>} A future result for the response
-     */
-    public putJsonAsync(url: string, value: any, jsonReplacer: (key: string, value: any) => any, token: tasks.CancellationToken): futures.Future<HttpResponse>;
-
-    /**
-     * Gets the response from issuing an HTTP PUT of a JSON serialized value to the requested url
-     * @param url {Uri} The url for the request
-     * @param value {any} The value to serialize
-     * @returns {futures.Future<HttpResponse>} A future result for the response
-     */
-    public putJsonAsync(url: Uri, value: any): futures.Future<HttpResponse>;
-
-    /**
-     * Gets the response from issuing an HTTP PUT of a JSON serialized value to the requested url
-     * @param url {Uri} The url for the request
-     * @param value {any} The value to serialize
-     * @param token {tasks.CancellationToken} A token that can be used to cancel the request
-     * @returns {futures.Future<HttpResponse>} A future result for the response
-     */
-    public putJsonAsync(url: Uri, value: any, token: tasks.CancellationToken): futures.Future<HttpResponse>;
+    public putJsonAsync(url: string, value: any, jsonReplacer?: (key: string, value: any) => any, token?: futures.CancellationToken): futures.Future<HttpResponse>;
 
     /**
      * Gets the response from issuing an HTTP PUT of a JSON serialized value to the requested url
      * @param url {Uri} The url for the request
      * @param value {any} The value to serialize
      * @param jsonReplacer {any[]} An array of replacements for the JSON serializer
+     * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Future<HttpResponse>} A future result for the response
      */
-    public putJsonAsync(url: Uri, value: any, jsonReplacer: any[]): futures.Future<HttpResponse>;
-
-    /**
-     * Gets the response from issuing an HTTP PUT of a JSON serialized value to the requested url
-     * @param url {Uri} The url for the request
-     * @param value {any} The value to serialize
-     * @param jsonReplacer {any[]} An array of replacements for the JSON serializer
-     * @param token {tasks.CancellationToken} A token that can be used to cancel the request
-     * @returns {futures.Future<HttpResponse>} A future result for the response
-     */
-    public putJsonAsync(url: Uri, value: any, jsonReplacer: any[], token: tasks.CancellationToken): futures.Future<HttpResponse>;
+    public putJsonAsync(url: Uri, value: any, jsonReplacer?: any[], token?: futures.CancellationToken): futures.Future<HttpResponse>;
 
     /**
      * Gets the response from issuing an HTTP PUT of a JSON serialized value to the requested url
      * @param url {Uri} The url for the request
      * @param value {any} The value to serialize
      * @param jsonReplacer {Function} A callback used to replace values during serialization
+     * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Future<HttpResponse>} A future result for the response
      */
-    public putJsonAsync(url: Uri, value: any, jsonReplacer: (key: string, value: any) => any): futures.Future<HttpResponse>;
+    public putJsonAsync(url: Uri, value: any, jsonReplacer?: (key: string, value: any) => any, token?: futures.CancellationToken): futures.Future<HttpResponse>;
 
-    /**
-     * Gets the response from issuing an HTTP PUT of a JSON serialized value to the requested url
-     * @param url {Uri} The url for the request
-     * @param value {any} The value to serialize
-     * @param jsonReplacer {Function} A callback used to replace values during serialization
-     * @param token {tasks.CancellationToken} A token that can be used to cancel the request
-     * @returns {futures.Future<HttpResponse>} A future result for the response
-     */
-    public putJsonAsync(url: Uri, value: any, jsonReplacer: (key: string, value: any) => any, token: tasks.CancellationToken): futures.Future<HttpResponse>;
-
-    public putJsonAsync(urlAny: any, value: any, ...args: any[]): futures.Future<HttpResponse> {
-        var argi = 0;
-        var jsonReplacerAny: any;
-        var token: tasks.CancellationToken;
-
-        if (typeof args[argi] === "function" || Array.isArray(args[argi])) jsonReplacerAny = args[argi++];
-        if (symbols.hasBrand(args[argi], tasks.CancellationToken)) token = args[argi];
-
-        var request = new HttpRequest("PUT", urlAny);
-        request.body = JSON.stringify(value, jsonReplacerAny);
+    public putJsonAsync(url: any, value: any, jsonReplacer?, token?: futures.CancellationToken): futures.Future<HttpResponse> {
+        var request = new HttpRequest("PUT", url);
+        request.body = JSON.stringify(value, jsonReplacer);
         request.setRequestHeader("Content-Type", "application/json");
         return this.sendAsync(request, token);
     }
@@ -963,74 +730,44 @@ export class HttpClient {
     /**
      * Gets the response from issuing an HTTP DELETE to the requested url
      * @param url {String} The url for the request
+     * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Future<HttpResponse>} A future result for the response
      */
-    public deleteAsync(url: string): futures.Future<HttpResponse>;
+    public deleteAsync(url: string, token?: futures.CancellationToken): futures.Future<HttpResponse>;
 
     /**
      * Gets the response from issuing an HTTP DELETE to the requested url
      * @param url {Uri} The url for the request
+     * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Future<HttpResponse>} A future result for the response
      */
-    public deleteAsync(url: Uri): futures.Future<HttpResponse>;
+    public deleteAsync(url: Uri, token?: futures.CancellationToken): futures.Future<HttpResponse>;
 
-    /**
-     * Gets the response from issuing an HTTP DELETE to the requested url
-     * @param url {String} The url for the request
-     * @param token {tasks.CancellationToken} A token that can be used to cancel the request
-     * @returns {futures.Future<HttpResponse>} A future result for the response
-     */
-    public deleteAsync(url: string, token: tasks.CancellationToken): futures.Future<HttpResponse>;
-
-    /**
-     * Gets the response from issuing an HTTP DELETE to the requested url
-     * @param url {Uri} The url for the request
-     * @param token {tasks.CancellationToken} A token that can be used to cancel the request
-     * @returns {futures.Future<HttpResponse>} A future result for the response
-     */
-    public deleteAsync(url: Uri, token: tasks.CancellationToken): futures.Future<HttpResponse>;
-
-    public deleteAsync(urlAny: any, token?: tasks.CancellationToken): futures.Future<HttpResponse> {
-        return this.sendAsync(new HttpRequest("DELETE", urlAny), token);
+    public deleteAsync(url: any, token?: futures.CancellationToken): futures.Future<HttpResponse> {
+        return this.sendAsync(new HttpRequest("DELETE", url), token);
     }
 
     /**
      * Sends the provided request and returns the response
      * @param request {HttpRequest} An HTTP request to send
+     * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Future<HttpResponse>} A future result for the response
      */
-    public sendAsync(request: HttpRequest): futures.Future<HttpResponse>;
-
-    /**
-     * Sends the provided request and returns the response
-     * @param request {HttpRequest} An HTTP request to send
-     * @param token {tasks.CancellationToken} A token that can be used to cancel the request
-     * @returns {futures.Future<HttpResponse>} A future result for the response
-     */
-    public sendAsync(request: HttpRequest, token: tasks.CancellationToken): futures.Future<HttpResponse>;
-
-    public sendAsync(request: HttpRequest, token?: tasks.CancellationToken): futures.Future<HttpResponse> {
-        var clientData = HttpClientDataSym.get(this);
-        if (!clientData || !symbols.hasBrand(this, HttpClient)) throw new TypeError("'this' is not an HttpClient object");
-        if (clientData.closed) throw new Error("Object doesn't support this action");
-
-        if (!symbols.hasBrand(request, HttpRequest)) throw new Error("Invalid argument: request");
-        if (!symbols.hasBrand(this.baseUrl, Uri) && !symbols.hasBrand(request.url, Uri)) throw new Error("Invalid argument: request");
+    public sendAsync(request: HttpRequest, token?: futures.CancellationToken): futures.Future<HttpResponse> {
+        if (this._closed) throw new Error("Object doesn't support this action");
 
         // create a linked token
-        var cts = new tasks.CancellationSource(token, clientData.cts.token);
+        var cts = new futures.CancellationSource(token, this._cts.token);
         if (this.timeout > 0) {
             cts.cancelAfter(this.timeout);
         }
 
-        return new futures.Future(resolver => {
-            var requestData = HttpRequestDataSym.get(request);
+        var requestHeaders = (<any>request)._headers;
+        var clientHeaders = this._headers;
+
+        return new futures.Future<HttpResponse>(resolver => {
             var xhr = new XMLHttpRequest();
-            var response = new HttpResponse();
-            var responseData = new HttpResponseData();
-            responseData.request = request;
-            responseData.xhr = xhr;
-            HttpResponseDataSym.set(response, responseData);
+            var response = new HttpResponse(request, xhr);
 
             var onload = e => {
                 cleanup();
@@ -1077,13 +814,13 @@ export class HttpClient {
             }
 
             // add the headers from the client
-            clientData.headers.forEach((value, key) => { 
-                xhr.setRequestHeader(key, value); 
+            Object.getOwnPropertyNames(clientHeaders).forEach(key => {
+                xhr.setRequestHeader(key, clientHeaders[key]);
             });
 
             // add the headers from the request
-            requestData.forEach((value, key) => {
-                xhr.setRequestHeader(key, value);
+            Object.getOwnPropertyNames(requestHeaders).forEach(key => {
+                xhr.setRequestHeader(key, requestHeaders[key]);
             });
 
             // wire up the events
@@ -1097,23 +834,6 @@ export class HttpClient {
     }
 }
 
-symbols.brand("HttpClient")(HttpClient)
-
 var UriParser = /^((?:(https?:)\/\/)(?:[^:@]*(?:\:[^@]*)?@)?(([a-z\d-\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF\.]+)(?:\:(\d+))?)?)?(?![a-z\d-]+\:)((?:^|\/)[^\?\#]*)?(\?[^#]*)?(#.*)?$/i;
 var UriParts = { "protocol": 2, "hostname": 4, "port": 5, "pathname": 6, "search": 7, "hash": 8 };
 var UriPorts = { "http:": 80, "https:": 443 };
-
-class HttpResponseData {
-    public request: HttpRequest;
-    public xhr: XMLHttpRequest;
-}
-
-class HttpClientData {
-    public headers = new lists.Map<string, string>();
-    public cts = new tasks.CancellationSource();
-    public closed: boolean;
-}
-
-var HttpRequestDataSym = new symbols.Symbol<lists.Map<string, string>>("httpclient.HttpRequestData");
-var HttpResponseDataSym = new symbols.Symbol<HttpResponseData>("httpclient.HttpResponseData");
-var HttpClientDataSym = new symbols.Symbol<HttpClientData>("httpclient.HttpClientData");

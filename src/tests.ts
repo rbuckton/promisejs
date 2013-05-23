@@ -1,6 +1,5 @@
 /// <reference path="../lib/node.d.ts" />
 import futures = module("futures");
-import tasks = module("tasks");
 import events = module("events");
 import assert = module("assert");
 import domain = module("domain");
@@ -343,7 +342,7 @@ var tests = [
             assert.ifError);
     },
     function Cancel_Future() {
-        var C = new tasks.CancellationSource();
+        var C = new futures.CancellationSource();
         var R;
         var F = new futures.Future(function(resolver) { R = resolver; }, C.token);
         C.cancel();
@@ -352,7 +351,7 @@ var tests = [
             assert.ifError);
     },
     function Cancel_Future_setTimeout() {
-        var C = new tasks.CancellationSource();
+        var C = new futures.CancellationSource();
         var F = new futures.Future<number>(function (resolver) {
             var timerId = setTimeout(() => {
                 resolver.resolve(1);

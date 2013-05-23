@@ -5,12 +5,11 @@
  * 
  */
 
-import tasks = module('tasks');
 import futures = module('futures');
 import httpclient = module('httpclient');
 
-export var CancellationSource = tasks.CancellationSource;
-export var CancellationToken = tasks.CancellationToken;
+export var CancellationSource = futures.CancellationSource;
+export var CancellationToken = futures.CancellationToken;
 export var Future = futures.Future;
 export var Uri = httpclient.Uri;
 export var HttpClient = httpclient.HttpClient;

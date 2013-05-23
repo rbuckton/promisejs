@@ -30,7 +30,6 @@
         d.prototype = new __();
     };
     var futures = require("./futures");
-    var tasks = require("./tasks");
     var events = require("events");
     var assert = require("assert");
     var domain = require("domain");
@@ -405,7 +404,7 @@
             }, assert.ifError);
         },
         function Cancel_Future() {
-            var C = new tasks.CancellationSource();
+            var C = new futures.CancellationSource();
             var R;
             var F = new futures.Future(function (resolver) {
                 R = resolver;
@@ -414,7 +413,7 @@
             F.done(assert.ifError, assert.ifError);
         },
         function Cancel_Future_setTimeout() {
-            var C = new tasks.CancellationSource();
+            var C = new futures.CancellationSource();
             var F = new futures.Future(function (resolver) {
                 var timerId = setTimeout(function () {
                     resolver.resolve(1);
