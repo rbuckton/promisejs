@@ -17,3 +17,5 @@ This contains an approximate polyfill for DOM Futures with several additions:
 * Several additional non-standard classes include:
   * **CancellationSource** - A source for a cancellation token that can be passed to the Future constructor or to various methods that allows an external actor to cancel the future.
   * **CancellationToken** - A token associated with a **CancellationSource** that is used to listen for a cancellation signal
+
+More information can be found in the [wiki](https://github.com/rbuckton/promisejs/wiki).
