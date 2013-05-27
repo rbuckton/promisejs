@@ -820,10 +820,9 @@ export class Future<T> {
     /** 
      * Creates a new Future that is resolved with the provided value. If the provided value is a Future, its completion is implicitly unwrapped to its accepted result.
      * @param value The value for the Future
-     * @param token The token to use for cancellation
      * @returns A Future for the value
      */
-    public static resolve<TResultD>(value: TResultD, token?: CancellationToken): Future<TResultD>;
+    public static resolve<TResultD>(value: TResultD): Future<TResultD>;
 
     /** 
      * Creates a new Future that is resolved with the provided value. If the provided value is a Future, its completion is implicitly unwrapped to its accepted result.
