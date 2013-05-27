@@ -38,7 +38,12 @@ var httpclient = {
 var tests = {
     target: "built/tests.js",
     inputs: ["src/tests.ts"],
-    outputs: ["built/tests.js"],
+    outputs: [
+        "built/tests.js", 
+        "built/tests.futures.js",
+        "built/tests.httpclient.js",
+        "built/tests.eventstream.js"
+    ],
     opts: opts,
     deps: [futures]
 }
@@ -95,7 +100,7 @@ modules.forEach(function (module) {
 
     module.deps.forEach(depfind);
 
-    tsc(module.target, deps, module.inputs, module.opts);    
+    tsc(module.target, deps, module.inputs, module.opts, module.outputs);    
 })
 
 task("default", ["build", "test"]);
@@ -133,12 +138,13 @@ function trimExtension(file) {
 
 /** Defines a compile task
   */
-function tsc(target, prereqs, sources, options) {
+function tsc(target, prereqs, sources, options, outputs) {
     options = copy({ target: "ES5" }, options);
-    
+    outputs = outputs || [target];
+
     if (!Array.isArray(sources)) {
         sources = [sources];
-      }
+    }
     
     // set a prereq on the source files
     if (Array.isArray(prereqs)) {
@@ -173,51 +179,53 @@ function tsc(target, prereqs, sources, options) {
             
         tsc.on("exit", function (code) {
             if (code == 0) {
-                if (/^umd$/i.test(options.module)) {
-                    try {
-                        // get the name of the module from its filename
-                        var targetId = trimExtension(target);
-                        var umd = copy({ }, options.umd);                
-                        
-                        // read the source
-                        var targetSrc = fs.readFileSync("obj/" + path.basename(target)).toString();
-                        
-                        // find the imports
-                        var imports = [];
-                        var re = /^\s*var\s+([a-z0-9_$]+)\s*=\s*require\s*\(\s*((['"])[[a-z0-9_\.\\\/ ]+\3)\s*\)\s*/gi;
-                        var m;
-                        while (m = re.exec(targetSrc)) {
-                            imports.push(m[2]);
+                outputs.forEach(function(target) {
+                    if (/^umd$/i.test(options.module)) {
+                        try {
+                            // get the name of the module from its filename
+                            var targetId = trimExtension(target);
+                            var umd = copy({ }, options.umd);                
+                            
+                            // read the source
+                            var targetSrc = fs.readFileSync("obj/" + path.basename(target)).toString();
+                            
+                            // find the imports
+                            var imports = [];
+                            var re = /^\s*var\s+([a-z0-9_$]+)\s*=\s*require\s*\(\s*((['"])[[a-z0-9_\.\\\/ ]+\3)\s*\)\s*/gi;
+                            var m;
+                            while (m = re.exec(targetSrc)) {
+                                imports.push(m[2]);
+                            }
+                            
+                            // load the umd template
+                            var umdSrc = fs.readFileSync("src/umd.js").toString();
+                            
+                            // transform the template
+                            var finalSrc = umdSrc.replace(/\${(\w+)}/gi, function (_, id) {
+                                if (id === "imports") {
+                                    return imports.length ? ", " + imports.join(", ") : "";
+                                }
+                                else if (id === "content") {
+                                    return targetSrc.split(/\r\n|\n/).join("\r\n    ").trim();
+                                }
+                                else if (id === "id") {
+                                    return targetId;
+                                }
+                                return "";
+                            });
+                            
+                            // write the file
+                            fs.writeFileSync(target, finalSrc);
                         }
-                        
-                        // load the umd template
-                        var umdSrc = fs.readFileSync("src/umd.js").toString();
-                        
-                        // transform the template
-                        var finalSrc = umdSrc.replace(/\${(\w+)}/gi, function (_, id) {
-                            if (id === "imports") {
-                                return imports.length ? ", " + imports.join(", ") : "";
-                            }
-                            else if (id === "content") {
-                                return targetSrc.split(/\r\n|\n/).join("\r\n    ").trim();
-                            }
-                            else if (id === "id") {
-                                return targetId;
-                            }
-                            return "";
-                        });
-                        
-                        // write the file
-                        fs.writeFileSync(target, finalSrc);
+                        catch (e) {
+                            console.error(e);
+                            fail();
+                        }
                     }
-                    catch (e) {
-                        console.error(e);
-                        fail();
+                    else if (options.obj) {
+                        fs.renameSync(path.join(options.obj, path.basename(target)), target);
                     }
-                }
-                else if (options.obj) {
-                    fs.renameSync(path.join(options.obj, path.basename(target)), target);
-                }
+                });
                 complete();
             }
             else {
