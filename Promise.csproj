@@ -30,14 +30,9 @@
     <Content Include="src\cancellation.ts" />
     <Content Include="src\httpclient.ts" />
     <Content Include="src\tests.promises.ts" />
-    <Content Include="older\eventstream.ts" />
-    <Content Include="older\httpclient.ts" />
     <Content Include="src\promisejs.ts" />
     <Content Include="src\promises.ts" />
-    <Content Include="older\promises.ts" />
-    <Content Include="older\tests.eventstream.ts" />
     <Content Include="src\tests.httpclient.ts" />
-    <Content Include="older\tests.promises.ts" />
     <Content Include="src\tests.ts" />
     <Content Include="src\umd.js" />
   </ItemGroup>
