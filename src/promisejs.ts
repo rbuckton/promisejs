@@ -5,16 +5,18 @@
  * 
  */
 
-import futures = module('futures');
+import promises = module('promises');
+import cancellation = module('cancellation');
 import httpclient = module('httpclient');
 
-export var Future = futures.Future;
-export var FutureResolver = futures.FutureResolver;
-export var Scheduler = futures.Scheduler;
-export var CancellationSource = futures.CancellationSource;
-export var CancellationToken = futures.CancellationToken;
-export var AggregateError = futures.AggregateError;
+export var Promise = promises.Promise;
+export var PromiseResolver = promises.PromiseResolver;
+export var CancellationSource = cancellation.CancellationSource;
+export var CancellationToken = cancellation.CancellationToken;
+export var AggregateError = cancellation.AggregateError;
+export var CancelledError = cancellation.CanceledError;
 export var Uri = httpclient.Uri;
+export var QueryString = httpclient.QueryString;
 export var HttpClient = httpclient.HttpClient;
 export var HttpRequest = httpclient.HttpRequest;
 export var HttpResponse = httpclient.HttpResponse;

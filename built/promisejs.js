@@ -4,13 +4,18 @@
 * https://github.com/rbuckton/promisejs/raw/master/LICENSE
 *
 */
-var futures = require("./futures");
+var promises = require("./promises");
+var cancellation = require("./cancellation");
 var httpclient = require("./httpclient");
 
-exports.CancellationSource = futures.CancellationSource;
-exports.CancellationToken = futures.CancellationToken;
-exports.Future = futures.Future;
+exports.Promise = promises.Promise;
+exports.PromiseResolver = promises.PromiseResolver;
+exports.CancellationSource = cancellation.CancellationSource;
+exports.CancellationToken = cancellation.CancellationToken;
+exports.AggregateError = cancellation.AggregateError;
+exports.CancelledError = cancellation.CanceledError;
 exports.Uri = httpclient.Uri;
+exports.QueryString = httpclient.QueryString;
 exports.HttpClient = httpclient.HttpClient;
 exports.HttpRequest = httpclient.HttpRequest;
 exports.HttpResponse = httpclient.HttpResponse;

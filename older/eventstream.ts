@@ -4,7 +4,7 @@
  * https://github.com/rbuckton/promisejs/raw/master/LICENSE
  * 
  */
-import futures = module("futures");
+import promises = module("promises");
 
 module linkedlist {
     export function Append(list: { head?; }, node: any): any {
@@ -76,7 +76,7 @@ module linkedlist {
   */
 export class EventSource<T> {
 
-    private _eventData: EventData;
+    private _eventData: EventData<T>;
     
     /** Source for sending events
       */
@@ -87,8 +87,8 @@ export class EventSource<T> {
     /** Accepts a value and sends it to a subscriber
       * @param value The value to send
       */
-    public accept(value: T): void {
-        this._eventData.accept(value);
+    public fulfill(value: T): void {
+        this._eventData.fulfill(value);
     }
 
     /** Sends a value to a subscriber.
@@ -99,15 +99,15 @@ export class EventSource<T> {
     /** Sends a future value to a subscriber.
       * @param value The value to send
       */
-    public resolve(value: futures.Future<T>, token?: futures.CancellationToken): void;
-    public resolve(value: any, token?: futures.CancellationToken): void {
+    public resolve(value: promises.Promise<T>, token?: promises.CancellationToken): void;
+    public resolve(value: any, token?: promises.CancellationToken): void {
         this._eventData.resolve(value, token);
     }
 
     /** Sends the contents of an event stream to this stream's subscribers
       * @param value The values to stream
       */
-    public merge(value: EventStream<T>, token?: futures.CancellationToken): void {
+    public merge(value: EventStream<T>, token?: promises.CancellationToken): void {
         this._eventData.merge(value, token);
     }
 
@@ -136,7 +136,7 @@ export class EventSource<T> {
  * A stream of events
  */
 export class EventStream<T> {    
-    private _eventData: EventData;
+    private _eventData: EventData<T>;
 
     /** 
      * A stream of events
@@ -149,16 +149,16 @@ export class EventStream<T> {
      * @param init A callback whose first argument is the source for the stream
      * @param token A token to use to stop listening to events
      */
-    constructor(init: (source: EventSource<T>) => void, token: futures.CancellationToken);
+    constructor(init: (source: EventSource<T>) => void, token: promises.CancellationToken);
 
     /** 
      * A stream of events
      * @param init A callback whose first argument is the source for the stream
      */
-    constructor(init: (source: EventSource<T>) => void, token?: futures.CancellationToken) {
+    constructor(init: (source: EventSource<T>) => void, token?: promises.CancellationToken) {
         var source: EventSource<T> = Object.create(EventSource.prototype);
         var data = new EventData<T>(this, source, token);
-        source.accept = source.accept.bind(source);
+        source.fulfill = source.fulfill.bind(source);
         source.resolve = source.resolve.bind(source);
         source.reject = source.reject.bind(source);
         source.close = source.close.bind(source);
@@ -175,14 +175,14 @@ export class EventStream<T> {
         return value instanceof EventStream;
     }
 
-    public static once<TResultA>(value: futures.Future<TResultA>, token?: futures.CancellationToken): EventStream<TResultA>;
-    public static once<TResultB>(value: TResultB): EventStream<TResultB>;
-    public static once(value: any, token?: futures.CancellationToken): EventStream {
-        var cts = new futures.CancellationSource(token);
+    public static once<TResult>(value: promises.Promise<TResult>, token?: promises.CancellationToken): EventStream<TResult>;
+    public static once<TResult>(value: TResult): EventStream<TResult>;
+    public static once(value: any, token?: promises.CancellationToken): EventStream {
+        var cts = new promises.CancellationSource(token);
         return new EventStream(source => {
-            if (futures.Future.isFuture(value)) {
+            if (promises.Promise.isPromise(value)) {
                 value.done(value => {
-                    source.accept(value);
+                    source.fulfill(value);
                     source.close();
                 },
                 source.reject,
@@ -190,25 +190,25 @@ export class EventStream<T> {
                 cts.token);
             }
             else {
-                source.accept(value);
+                source.fulfill(value);
                 source.close();
             }
         }, cts.token);
     }
 
-    public static empty<TResultC>(): EventStream<TResultC> {
-        return new EventStream<TResultC>(source => { source.close(); });
+    public static empty<TResult>(): EventStream<TResult> {
+        return new EventStream<TResult>(source => { source.close(); });
     }
 
-    public static repeat<TResultD>(count: number, value: futures.Future<TResultD>, token?: futures.CancellationToken): EventStream<TResultD>;
-    public static repeat<TResultE>(count: number, value: TResultE): EventStream<TResultE>; 
-    public static repeat(count: number, value: any, token?: futures.CancellationToken): EventStream {
-        var cts = new futures.CancellationSource(token);
+    public static repeat<TResult>(count: number, value: promises.Promise<TResult>, token?: promises.CancellationToken): EventStream<TResult>;
+    public static repeat<TResult>(count: number, value: TResult): EventStream<TResult>; 
+    public static repeat(count: number, value: any, token?: promises.CancellationToken): EventStream {
+        var cts = new promises.CancellationSource(token);
         return new EventStream(source => {
-            if (futures.Future.isFuture(value)) {
+            if (promises.Promise.isPromise(value)) {
                 value.done(value => {
                     while (count--) {
-                        source.accept(value);
+                        source.fulfill(value);
                     }
 
                     source.close();
@@ -219,7 +219,7 @@ export class EventStream<T> {
             }
             else {
                 while (count-- > 0) {
-                    source.accept(value);
+                    source.fulfill(value);
                 }
 
                 source.close();
@@ -235,7 +235,7 @@ export class EventStream<T> {
       * @param token The cancellation token to use to stop listening.
       * @returns A new EventStream for the stream.
       */
-    public listen(receive: (value: T) => void, reject?: (value: any) => void, close?: ()=> void, cancel?: () => void, token?: futures.CancellationToken): void {
+    public listen(receive: (value: T) => void, reject?: (value: any) => void, close?: ()=> void, cancel?: () => void, token?: promises.CancellationToken): void {
         this._eventData.append(
             receive,
             reject || e => { throw e; }, 
@@ -244,11 +244,11 @@ export class EventStream<T> {
             token);
     }
 
-    public map<TResult>(projection: (value: T, index: number, stream: EventStream<T>) => futures.Future<TResult>, thisArg?: any, token?: futures.CancellationToken): EventStream<TResult>;
-    public map<TResult>(projection: (value: T, index: number, stream: EventStream<T>) => TResult, thisArg?: any, token?: futures.CancellationToken): EventStream<TResult>;
-    public map(projection: (value, any, index, stream) => any, thisArg?, token?: futures.CancellationToken): EventStream {
+    public map<TResult>(projection: (value: T, index: number, stream: EventStream<T>) => promises.Promise<TResult>, thisArg?: any, token?: promises.CancellationToken): EventStream<TResult>;
+    public map<TResult>(projection: (value: T, index: number, stream: EventStream<T>) => TResult, thisArg?: any, token?: promises.CancellationToken): EventStream<TResult>;
+    public map(projection: (value, any, index, stream) => any, thisArg?, token?: promises.CancellationToken): EventStream {
         var index = 0;
-        var cts = new futures.CancellationSource(token);
+        var cts = new promises.CancellationSource(token);
         return new EventStream(source => {
             this.listen(
                 value => { 
@@ -267,15 +267,15 @@ export class EventStream<T> {
         }, cts.token);
     }
 
-    public filter(predicate: (value: T, index: number, stream: EventStream<T>) => boolean, thisArg?: any, token?: futures.CancellationToken): EventStream<T> {
+    public filter(predicate: (value: T, index: number, stream: EventStream<T>) => boolean, thisArg?: any, token?: promises.CancellationToken): EventStream<T> {
         var index = 0;
-        var cts = new futures.CancellationSource(token);
+        var cts = new promises.CancellationSource(token);
         return new EventStream(source => {
             this.listen(
                 value => {
                     try {
                         if (predicate.call(thisArg, value, index++, this)) {
-                            source.accept(value);
+                            source.fulfill(value);
                         }
                     }
                     catch (e) {
@@ -290,12 +290,12 @@ export class EventStream<T> {
         }, cts.token);
     }
 
-    public reduce(aggregate: (previousValue: T, value: T, index: number, stream: EventStream<T>) => T, token?: futures.CancellationToken): futures.Future<T>;
-    public reduce<TAccumulate>(aggregate: (previousValue: TAccumulate, value: T, index: number, stream: EventStream<T>) => TAccumulate, initialValue: TAccumulate, token?: futures.CancellationToken): futures.Future<TAccumulate>;
-    public reduce(aggregate: (previousValue, value, index, stream) => any, ...args: any[]): futures.Future {
+    public reduce(aggregate: (previousValue: T, value: T, index: number, stream: EventStream<T>) => T, token?: promises.CancellationToken): promises.Promise<T>;
+    public reduce<TAccumulate>(aggregate: (previousValue: TAccumulate, value: T, index: number, stream: EventStream<T>) => TAccumulate, initialValue: TAccumulate, token?: promises.CancellationToken): promises.Promise<TAccumulate>;
+    public reduce(aggregate: (previousValue, value, index, stream) => any, ...args: any[]): promises.Promise {
         var hasValue = false;
         var initialValue: any;
-        var token: futures.CancellationToken;
+        var token: promises.CancellationToken;
 
         if (args.length >= 2) {
             hasValue = true;
@@ -303,7 +303,7 @@ export class EventStream<T> {
             token = args[1];
         }
         else if (args.length == 1) {
-            if (args[0] instanceof futures.CancellationToken) {
+            if (args[0] instanceof promises.CancellationToken) {
                 token = args[0];
             }
             else {
@@ -313,8 +313,8 @@ export class EventStream<T> {
         }
 
         var index = 0;
-        var cts = new futures.CancellationSource(token);
-        return new futures.Future(resolver => {
+        var cts = new promises.CancellationSource(token);
+        return new promises.Promise(resolver => {
             var accumulator;
             if (hasValue) {
                 accumulator = initialValue;
@@ -345,12 +345,12 @@ export class EventStream<T> {
         }, cts.token);        
     }
 
-    public reduceRight(aggregate: (previousValue: T, value: T, index: number, stream: EventStream<T>) => T, token?: futures.CancellationToken): futures.Future<T>;
-    public reduceRight<TAccumulate>(aggregate: (previousValue: TAccumulate, value: T, index: number, stream: EventStream<T>) => TAccumulate, initialValue?: TAccumulate, token?: futures.CancellationToken): futures.Future<TAccumulate>;
-    public reduceRight(aggregate: (previousValue, value, index, stream) => any, ...args: any[]): futures.Future {
+    public reduceRight(aggregate: (previousValue: T, value: T, index: number, stream: EventStream<T>) => T, token?: promises.CancellationToken): promises.Promise<T>;
+    public reduceRight<TAccumulate>(aggregate: (previousValue: TAccumulate, value: T, index: number, stream: EventStream<T>) => TAccumulate, initialValue?: TAccumulate, token?: promises.CancellationToken): promises.Promise<TAccumulate>;
+    public reduceRight(aggregate: (previousValue, value, index, stream) => any, ...args: any[]): promises.Promise {
         var hasValue = false;
         var initialValue: any;
-        var token: futures.CancellationToken;
+        var token: promises.CancellationToken;
 
         if (args.length >= 2) {
             hasValue = true;
@@ -358,7 +358,7 @@ export class EventStream<T> {
             token = args[1];
         }
         else if (args.length == 1) {
-            if (args[0] instanceof futures.CancellationToken) {
+            if (args[0] instanceof promises.CancellationToken) {
                 token = args[0];
             }
             else {
@@ -368,9 +368,9 @@ export class EventStream<T> {
         }
 
         var index = 0;
-        var cts = new futures.CancellationSource(token);
+        var cts = new promises.CancellationSource(token);
         var values = [];
-        return new futures.Future(resolver => {
+        return new promises.Promise(resolver => {
             var accumulator;
             if (hasValue) {
                 accumulator = initialValue;
@@ -406,10 +406,10 @@ export class EventStream<T> {
         }, cts.token);
     }
 
-    public first(predicate: (value: T, index: number, stream: EventStream<T>) => boolean, thisArg?: any, token?: futures.CancellationToken): futures.Future<T> {
+    public first(predicate: (value: T, index: number, stream: EventStream<T>) => boolean, thisArg?: any, token?: promises.CancellationToken): promises.Promise<T> {
         var index = 0;
-        var cts = new futures.CancellationSource(token);
-        return new futures.Future<T>(resolver => {
+        var cts = new promises.CancellationSource(token);
+        return new promises.Promise<T>(resolver => {
             this.listen(
                 value => {
                     try {
@@ -431,12 +431,12 @@ export class EventStream<T> {
         }, cts.token);
     }
 
-    public last(predicate: (value: T, index: number, stream: EventStream<T>) => boolean, thisArg?: any, token?: futures.CancellationToken): futures.Future<T> {
+    public last(predicate: (value: T, index: number, stream: EventStream<T>) => boolean, thisArg?: any, token?: promises.CancellationToken): promises.Promise<T> {
         var result: T;
         var hasValue = false;
         var index = 0;
-        var cts = new futures.CancellationSource(token);
-        return new futures.Future(resolver => {
+        var cts = new promises.CancellationSource(token);
+        return new promises.Promise(resolver => {
             this.listen(
                 value => {
                     try {
@@ -464,10 +464,10 @@ export class EventStream<T> {
         }, cts.token);
     }
 
-    public some(predicate: (value: T, index: number, stream: EventStream<T>) => boolean, thisArg?: any, token?: futures.CancellationToken): futures.Future<boolean> {
+    public some(predicate: (value: T, index: number, stream: EventStream<T>) => boolean, thisArg?: any, token?: promises.CancellationToken): promises.Promise<boolean> {
         var index = 0;
-        var cts = new futures.CancellationSource(token);
-        return new futures.Future<boolean>(resolver => {
+        var cts = new promises.CancellationSource(token);
+        return new promises.Promise<boolean>(resolver => {
             this.listen(
                 value => {
                     try {
@@ -490,10 +490,10 @@ export class EventStream<T> {
         }, cts.token);
     }
 
-    public every(predicate: (value: T, index: number, stream: EventStream<T>) => boolean, thisArg?: any, token?: futures.CancellationToken): futures.Future<boolean> {
+    public every(predicate: (value: T, index: number, stream: EventStream<T>) => boolean, thisArg?: any, token?: promises.CancellationToken): promises.Promise<boolean> {
         var index = 0;
-        var cts = new futures.CancellationSource(token);
-        return new futures.Future<boolean>(resolver => {
+        var cts = new promises.CancellationSource(token);
+        return new promises.Promise<boolean>(resolver => {
             this.listen(
                 value => {
                     try {
@@ -514,11 +514,11 @@ export class EventStream<T> {
         }, cts.token);
     }
 
-    public count(predicate: (value: T, index: number, stream: EventStream<T>) => boolean, thisArg?: any, token?: futures.CancellationToken): futures.Future<number> {
+    public count(predicate: (value: T, index: number, stream: EventStream<T>) => boolean, thisArg?: any, token?: promises.CancellationToken): promises.Promise<number> {
         var index = 0;
         var count = 0;
-        var cts = new futures.CancellationSource(token);
-        return new futures.Future<boolean>(resolver => {
+        var cts = new promises.CancellationSource(token);
+        return new promises.Promise<number>(resolver => {
             this.listen(
                 value => {
                     try {
@@ -540,8 +540,8 @@ export class EventStream<T> {
         }, cts.token);
     }
 
-    public skip(count: number, token?: futures.CancellationToken): EventStream<T> {
-        var cts = new futures.CancellationSource(token);
+    public skip(count: number, token?: promises.CancellationToken): EventStream<T> {
+        var cts = new promises.CancellationSource(token);
         return new EventStream<T>(source => {
             this.listen(
                 value => {
@@ -549,7 +549,7 @@ export class EventStream<T> {
                         count--;
                     }
                     else {
-                        source.accept(value);
+                        source.fulfill(value);
                     }
                 },
                 source.reject,
@@ -559,14 +559,14 @@ export class EventStream<T> {
         }, cts.token);
     }
 
-    public take(count: number, token?: futures.CancellationToken): EventStream<T> {
-        var cts = new futures.CancellationSource(token);
+    public take(count: number, token?: promises.CancellationToken): EventStream<T> {
+        var cts = new promises.CancellationSource(token);
         return new EventStream<T>(source => {
             this.listen(
                 value => {
                     if (count > 0) {
                         count--;
-                        source.accept(value);
+                        source.fulfill(value);
                     }
                     else {
                         source.close();
@@ -580,17 +580,17 @@ export class EventStream<T> {
         }, cts.token)
     }
 
-    public skipWhile(predicate: (value: T, index: number, stream: EventStream<T>) => boolean, thisArg?: any, token?: futures.CancellationToken): EventStream<T> {
+    public skipWhile(predicate: (value: T, index: number, stream: EventStream<T>) => boolean, thisArg?: any, token?: promises.CancellationToken): EventStream<T> {
         var done = false;
         var index = 0;
-        var cts = new futures.CancellationSource(token);
+        var cts = new promises.CancellationSource(token);
         return new EventStream<T>(source => {
             this.listen(
                 value => {
                     try {
                         done = done || !predicate.call(thisArg, value, index++, this);
                         if (done) {
-                            source.accept(value);
+                            source.fulfill(value);
                         }
                     }
                     catch (e) {
@@ -606,15 +606,15 @@ export class EventStream<T> {
         }, cts.token)
     }
 
-    public takeWhile(predicate: (value: T, index: number, stream: EventStream<T>) => boolean, thisArg?: any, token?: futures.CancellationToken): EventStream<T> {
+    public takeWhile(predicate: (value: T, index: number, stream: EventStream<T>) => boolean, thisArg?: any, token?: promises.CancellationToken): EventStream<T> {
         var index = 0;
-        var cts = new futures.CancellationSource(token);
+        var cts = new promises.CancellationSource(token);
         return new EventStream<T>(source => {
             this.listen(
                 value => {
                     try {
                         if (predicate.call(thisArg, value, index++, this)) {
-                            source.accept(value);
+                            source.fulfill(value);
                         }
                         else {
                             source.close();
@@ -633,9 +633,9 @@ export class EventStream<T> {
         }, cts.token);
     }
 
-    public skipUntil(future: futures.Future<any>, token?: futures.CancellationToken): EventStream<T> {
+    public skipUntil(future: promises.Promise<any>, token?: promises.CancellationToken): EventStream<T> {
         var done = false;
-        var cts = new futures.CancellationSource(token);
+        var cts = new promises.CancellationSource(token);
         return new EventStream<T>(source => {            
             future.done(
                 () => { 
@@ -651,7 +651,7 @@ export class EventStream<T> {
             this.listen(
                 value => {
                     if (done) {
-                        source.accept(value);
+                        source.fulfill(value);
                     }
                 },
                 e => {
@@ -667,8 +667,8 @@ export class EventStream<T> {
         }, cts.token)
     }
 
-    public takeUntil(future: futures.Future<any>, token?: futures.CancellationToken): EventStream<T> {
-        var cts = new futures.CancellationSource(token);
+    public takeUntil(future: promises.Promise<any>, token?: promises.CancellationToken): EventStream<T> {
+        var cts = new promises.CancellationSource(token);
         return new EventStream<T>(source => {
             future.done(
                 () => {
@@ -682,7 +682,7 @@ export class EventStream<T> {
                 cts.token);
 
             this.listen(
-                source.accept,
+                source.fulfill,
                 e => {
                     source.reject(e);
                     cts.cancel();
@@ -696,8 +696,8 @@ export class EventStream<T> {
         }, cts.token);
     }
 
-    public zip<TOther, TResult>(other: EventStream<TOther>, projection: (left: T, right: TOther, index: number, leftStream: EventStream<T>, rightStream: EventStream<TOther>) => TResult, thisArg?: any, token?: futures.CancellationToken): EventStream<TResult> {
-        var cts = new futures.CancellationSource(token);
+    public zip<TOther, TResult>(other: EventStream<TOther>, projection: (left: T, right: TOther, index: number, leftStream: EventStream<T>, rightStream: EventStream<TOther>) => TResult, thisArg?: any, token?: promises.CancellationToken): EventStream<TResult> {
+        var cts = new promises.CancellationSource(token);
         var index = 0;
         var left = [];
         var right = [];
@@ -716,7 +716,7 @@ export class EventStream<T> {
                     else {
                         try {
                             var result = projection.call(thisArg, value, right.shift(), index++, this, other);
-                            source.accept(result);
+                            source.fulfill(result);
                         }
                         catch (e) {
                             source.reject(e);
@@ -743,7 +743,7 @@ export class EventStream<T> {
                     else {
                         try {
                             var result = projection.call(thisArg, left.shift(), value, index++, this, other);
-                            source.accept(result);
+                            source.fulfill(result);
                         }
                         catch (e) {
                             source.reject(e);
@@ -765,8 +765,8 @@ export class EventStream<T> {
         }, cts.token);
     }
 
-    public throttle(delay: number, token?: futures.CancellationToken): EventStream<T> {
-        var cts = new futures.CancellationSource(token);
+    public throttle(delay: number, token?: promises.CancellationToken): EventStream<T> {
+        var cts = new promises.CancellationSource(token);
         return new EventStream<T>(source => {
             var pending = false;
             var state: EventState;
@@ -775,10 +775,10 @@ export class EventStream<T> {
             var request = () => {
                 if (!pending) {
                     pending = true;
-                    futures.Scheduler.current.post(() => {
+                    promises.Scheduler.current.post(() => {
                         pending = false;
                         if (state === EventState.sending) {
-                            source.accept(last);
+                            source.fulfill(last);
                             hasLast = false;
                             last = null;
                         }
@@ -790,7 +790,7 @@ export class EventStream<T> {
                         }
                         else if (state === EventState.closed) {
                             if (hasLast) {
-                                source.accept(last);
+                                source.fulfill(last);
                                 hasLast = false;
                                 last = null;
                             }
@@ -825,10 +825,10 @@ export class EventStream<T> {
         }, cts.token);
     }
 
-    public toArray(token?: futures.CancellationToken): futures.Future<T[]> {
+    public toArray(token?: promises.CancellationToken): promises.Promise<T[]> {
         var values = [];
-        var cts = new futures.CancellationSource(token);
-        return new futures.Future<T[]>(resolver => {
+        var cts = new promises.CancellationSource(token);
+        return new promises.Promise<T[]>(resolver => {
             this.listen(
                 value => {
                     values.push(value);
@@ -845,19 +845,19 @@ export class EventStream<T> {
     }
 }
 
-class EventData {
-    public events: EventStream;
-    public source: EventSource;
+class EventData<T> {
+    public events: EventStream<T>;
+    public source: EventSource<T>;
     public resolveCallbacks: { head?; };
     public rejectCallbacks: { head?; };
     public closeCallbacks: { head?; };
     public cancelCallbacks: { head?; };
     public pending: { head?; };
     public state: EventState = EventState.pending;
-    public token: futures.CancellationToken;
+    public token: promises.CancellationToken;
     public cancellationHandle: number;
 
-    constructor(events: EventStream, source: EventSource, token: futures.CancellationToken) {
+    constructor(events: EventStream<T>, source: EventSource<T>, token: promises.CancellationToken) {
         Object.defineProperty(events, "_eventData", { value: this });
         Object.defineProperty(source, "_eventData", { value: this });
 
@@ -873,7 +873,7 @@ class EventData {
         }
     }
 
-    public accept(value: any, synchronous?: boolean): void {
+    public fulfill(value: any, synchronous?: boolean): void {
         if (this.state > EventState.sending) {
             return;
         }
@@ -888,20 +888,20 @@ class EventData {
         this.processPending(synchronous);
     }
 
-    public resolve(value: any, token: futures.CancellationToken, synchronous?: boolean): void {
+    public resolve(value: any, token: promises.CancellationToken, synchronous?: boolean): void {
         if (this.state > EventState.sending) {
             return;
         }
 
-        if (futures.Future.isFuture(value)) {
-            var cts = new futures.CancellationSource(this.token, token);
+        if (promises.Promise.isPromise(value)) {
+            var cts = new promises.CancellationSource(this.token, token);
             if (!this.pending) {
                 this.pending = {};
             }
             
             this.state = EventState.sending;
             var node = linkedlist.Append(this.pending, { kind: EventState.pending });
-            var future = <futures.Future>value;
+            var future = <promises.Promise>value;
             var resolve = value => {
                 if (this.state === EventState.canceled) return;
                 node.value = value;
@@ -926,13 +926,13 @@ class EventData {
             return;
         }
 
-        this.accept(value, synchronous);
+        this.fulfill(value, synchronous);
     }
 
-    public merge(stream: EventStream, token: futures.CancellationToken): void {
+    public merge(stream: EventStream<T>, token: promises.CancellationToken): void {
         stream.listen(
             value => {
-                this.accept(value, true);
+                this.fulfill(value, true);
             },
             e => {
                 this.reject(e, true);
@@ -985,7 +985,7 @@ class EventData {
         this.processPending(/*synchronous:*/ true);
     }
 
-    public append(receiveCallback: (value: any) => void, rejectCallback: (value: any) => void, closeCallback: () => void, cancelCallback: () => void, token: futures.CancellationToken): void {
+    public append(receiveCallback: (value: any) => void, rejectCallback: (value: any) => void, closeCallback: () => void, cancelCallback: () => void, token: promises.CancellationToken): void {
         
         if (!(token && token.canceled)) {
             if (typeof receiveCallback === "function") {
@@ -1113,7 +1113,7 @@ class EventData {
                     var callback = node.value.callback, token = node.value.token;
                     if (!(token && token.canceled)) { 
                         // execute either synchronously or as a microtask at the end of the turn
-                        futures.Scheduler.current.post(
+                        promises.Scheduler.current.post(
                             callback.bind(null, result), 
                             { synchronous: synchronous }, 
                             token);

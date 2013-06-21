@@ -5,7 +5,7 @@
  * https://github.com/rbuckton/promisejs/raw/master/LICENSE
  * 
  */
-import futures = module("futures");
+import promises = module("promises");
 import http = module("httpclient");
 import assert = module("assert");
 

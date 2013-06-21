@@ -4,7 +4,6 @@
  * https://github.com/rbuckton/promisejs/raw/master/LICENSE
  * 
  */
-import cancellation = module("cancellation");
 import promises = module("promises");
 
 /**
@@ -280,27 +279,13 @@ export class Uri {
                 return "";
 
             case "fragment":
-            case "hash": 
-                var hash = String(this.hash || "");
-                if (hash.length > 0 && hash.charAt(0) != "#") {
-                    return "#" + hash;
-                }
-                return hash;
-
+            case "hash": return String(this.hash || "");
             case "path":
-            case "pathname": 
-                return String(this.pathname || "");
-
+            case "pathname": return String(this.pathname || "");
             case "search":
-            case "query": 
-                var search = String(this.search || "");
-                if (search.length > 0 && search.charAt(0) != "?") {
-                    return "?" + search;
-                }
-                return search;
+            case "query": return String(this.search || "");
 
-            default: 
-                return this.toString("origin") + this.toString("pathname") + this.toString("search") + this.toString("hash");
+            default: return this.toString("origin") + this.toString("pathname") + this.toString("search") + this.toString("hash");
         }
     }
 
@@ -347,81 +332,6 @@ export class Uri {
 
     public static combine(baseUri: any, uri: any): Uri {
         return new Uri(baseUri, uri);
-    }
-}
-
-export module QueryString {
-
-    var hasOwn = Object.prototype.hasOwnProperty;
-    var QueryStringParser = /(?:\?|&|^)([^=&]*)(?:=([^&]*))?/g;
-
-    export function stringify(obj: any): string {
-        var qs = [];
-        Object.getOwnPropertyNames(obj).forEach(name => {
-            var value = obj[name];
-            switch (typeof value) {
-                case "string":
-                case "number":
-                case "boolean": {
-                    qs.push(encodeURIComponent(name) + "=" + encodeURIComponent(String(value)));
-                    return;
-                }
-
-                default: {
-                    if (Array.isArray(value)) {
-                        var ar = <any[]>value;
-                        for (var i = 0, n = ar.length; i < n; i++) {
-                            switch (typeof ar[i]) {
-                                case "string":
-                                case "number":
-                                case "boolean":
-                                    qs.push(encodeURIComponent(name) + "=" + encodeURIComponent(String(value)));
-                                    break;
-
-                                default:
-                                    qs.push(encodeURIComponent(name) + "=");
-                                    break;
-                            }
-                        }
-                    }
-                    else {
-                        qs.push(encodeURIComponent(name) + "=");
-                    }
-                }
-            }
-        });
-
-        if (qs.length) {
-            return "?" + qs.join("&");
-        }
-
-        return "";
-    }
-
-    export function parse(text: string): any {
-        var obj: any = {};
-        var part: RegExpExecArray;
-        while (part = QueryStringParser.exec(text)) {
-            var key = decodeURIComponent(part[1]);
-            if (key.length && key !== "__proto__") {
-                var value = decodeURIComponent(part[2]);
-                if (hasOwn.call(obj, key)) {
-                    var previous = obj[key];
-                    if (Array.isArray(previous)) {
-                        var ar = <any[]>previous;
-                        ar.push(value);
-                    }
-                    else {
-                        obj[key] = [previous, value];
-                    }
-                }
-                else {
-                    obj[key] = value;
-                }
-            }
-        }
-
-        return obj;
     }
 }
 
@@ -550,7 +460,7 @@ export class HttpResponse {
 export class HttpClient {
 
     private _headers: { [key: string]: string; };
-    private _cts: cancellation.CancellationSource;
+    private _cts: promises.CancellationSource;
     private _closed: boolean;
 
     /**
@@ -598,7 +508,7 @@ export class HttpClient {
     constructor(baseUrl?: any) {
         Object.defineProperties(this, {
             _headers: { value: Object.create(null) },
-            _cts: { value: new cancellation.CancellationSource() },
+            _cts: { value: new promises.CancellationSource() },
             _closed: { value: false, writable: true }
         })
                 
@@ -653,7 +563,7 @@ export class HttpClient {
      * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Promise<HttpResponse>} A future result for the response
      */
-    public getAsync(url: string, token?: cancellation.CancellationToken): promises.Promise<HttpResponse>;
+    public getAsync(url: string, token?: promises.CancellationToken): promises.Promise<HttpResponse>;
 
     /**
      * Gets the response from issuing an HTTP GET to the requested url
@@ -661,9 +571,9 @@ export class HttpClient {
      * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Promise<HttpResponse>} A future result for the response
      */
-    public getAsync(url: Uri, token?: cancellation.CancellationToken): promises.Promise<HttpResponse>;
+    public getAsync(url: Uri, token?: promises.CancellationToken): promises.Promise<HttpResponse>;
 
-    public getAsync(url: any, token?: cancellation.CancellationToken): promises.Promise<HttpResponse> {
+    public getAsync(url: any, token?: promises.CancellationToken): promises.Promise<HttpResponse> {
         return this.sendAsync(new HttpRequest("GET", url), token);
     }
 
@@ -674,7 +584,7 @@ export class HttpClient {
      * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Promise<HttpResponse>} A future result for the response
      */
-    public postAsync(url: string, body: any, token?: cancellation.CancellationToken): promises.Promise<HttpResponse>;
+    public postAsync(url: string, body: any, token?: promises.CancellationToken): promises.Promise<HttpResponse>;
 
     /**
      * Gets the response from issuing an HTTP POST to the requested url
@@ -683,9 +593,9 @@ export class HttpClient {
      * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Promise<HttpResponse>} A future result for the response
      */
-    public postAsync(url: Uri, body: any, token?: cancellation.CancellationToken): promises.Promise<HttpResponse>;
+    public postAsync(url: Uri, body: any, token?: promises.CancellationToken): promises.Promise<HttpResponse>;
 
-    public postAsync(url: any, body: any, token?: cancellation.CancellationToken): promises.Promise<HttpResponse> {
+    public postAsync(url: any, body: any, token?: promises.CancellationToken): promises.Promise<HttpResponse> {
         var request = new HttpRequest("POST", url);
         request.body = body;
         return this.sendAsync(request, token);
@@ -699,7 +609,7 @@ export class HttpClient {
      * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Promise<HttpResponse>} A future result for the response
      */
-    public postJsonAsync(url: string, value: any, jsonReplacer?: any[], token?: cancellation.CancellationToken): promises.Promise<HttpResponse>;
+    public postJsonAsync(url: string, value: any, jsonReplacer?: any[], token?: promises.CancellationToken): promises.Promise<HttpResponse>;
 
     /**
      * Gets the response from issuing an HTTP POST of a JSON serialized value to the requested url
@@ -709,7 +619,7 @@ export class HttpClient {
      * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Promise<HttpResponse>} A future result for the response
      */
-    public postJsonAsync(url: string, value: any, jsonReplacer?: (key: string, value: any) => any, token?: cancellation.CancellationToken): promises.Promise<HttpResponse>;
+    public postJsonAsync(url: string, value: any, jsonReplacer?: (key: string, value: any) => any, token?: promises.CancellationToken): promises.Promise<HttpResponse>;
 
     /**
      * Gets the response from issuing an HTTP POST of a JSON serialized value to the requested url
@@ -719,7 +629,7 @@ export class HttpClient {
      * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Promise<HttpResponse>} A future result for the response
      */
-    public postJsonAsync(url: Uri, value: any, jsonReplacer?: any[], token?: cancellation.CancellationToken): promises.Promise<HttpResponse>;
+    public postJsonAsync(url: Uri, value: any, jsonReplacer?: any[], token?: promises.CancellationToken): promises.Promise<HttpResponse>;
 
     /**
      * Gets the response from issuing an HTTP POST of a JSON serialized value to the requested url
@@ -729,9 +639,9 @@ export class HttpClient {
      * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Promise<HttpResponse>} A future result for the response
      */
-    public postJsonAsync(url: Uri, value: any, jsonReplacer?: (key: string, value: any) => any, token?: cancellation.CancellationToken): promises.Promise<HttpResponse>;
+    public postJsonAsync(url: Uri, value: any, jsonReplacer?: (key: string, value: any) => any, token?: promises.CancellationToken): promises.Promise<HttpResponse>;
 
-    public postJsonAsync(url: any, value: any, jsonReplacer?, token?: cancellation.CancellationToken): promises.Promise<HttpResponse> {
+    public postJsonAsync(url: any, value: any, jsonReplacer?, token?: promises.CancellationToken): promises.Promise<HttpResponse> {
         var request = new HttpRequest("POST", url);
         request.body = JSON.stringify(value, jsonReplacer);
         request.setRequestHeader("Content-Type", "application/json");
@@ -745,7 +655,7 @@ export class HttpClient {
      * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Promise<HttpResponse>} A future result for the response
      */
-    public putAsync(url: string, body: any, token?: cancellation.CancellationToken): promises.Promise<HttpResponse>;
+    public putAsync(url: string, body: any, token?: promises.CancellationToken): promises.Promise<HttpResponse>;
 
     /**
      * Gets the response from issuing an HTTP PUT to the requested url
@@ -754,9 +664,9 @@ export class HttpClient {
      * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Promise<HttpResponse>} A future result for the response
      */
-    public putAsync(url: Uri, body: any, token?: cancellation.CancellationToken): promises.Promise<HttpResponse>;
+    public putAsync(url: Uri, body: any, token?: promises.CancellationToken): promises.Promise<HttpResponse>;
 
-    public putAsync(url: any, body: any, token?: cancellation.CancellationToken): promises.Promise<HttpResponse> {
+    public putAsync(url: any, body: any, token?: promises.CancellationToken): promises.Promise<HttpResponse> {
         var request = new HttpRequest("PUT", url);
         request.body = body;
         return this.sendAsync(request, token);
@@ -770,7 +680,7 @@ export class HttpClient {
      * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Promise<HttpResponse>} A future result for the response
      */
-    public putJsonAsync(url: string, value: any, jsonReplacer?: any[], token?: cancellation.CancellationToken): promises.Promise<HttpResponse>;
+    public putJsonAsync(url: string, value: any, jsonReplacer?: any[], token?: promises.CancellationToken): promises.Promise<HttpResponse>;
 
     /**
      * Gets the response from issuing an HTTP PUT of a JSON serialized value to the requested url
@@ -780,7 +690,7 @@ export class HttpClient {
      * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Promise<HttpResponse>} A future result for the response
      */
-    public putJsonAsync(url: string, value: any, jsonReplacer?: (key: string, value: any) => any, token?: cancellation.CancellationToken): promises.Promise<HttpResponse>;
+    public putJsonAsync(url: string, value: any, jsonReplacer?: (key: string, value: any) => any, token?: promises.CancellationToken): promises.Promise<HttpResponse>;
 
     /**
      * Gets the response from issuing an HTTP PUT of a JSON serialized value to the requested url
@@ -790,7 +700,7 @@ export class HttpClient {
      * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Promise<HttpResponse>} A future result for the response
      */
-    public putJsonAsync(url: Uri, value: any, jsonReplacer?: any[], token?: cancellation.CancellationToken): promises.Promise<HttpResponse>;
+    public putJsonAsync(url: Uri, value: any, jsonReplacer?: any[], token?: promises.CancellationToken): promises.Promise<HttpResponse>;
 
     /**
      * Gets the response from issuing an HTTP PUT of a JSON serialized value to the requested url
@@ -800,9 +710,9 @@ export class HttpClient {
      * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Promise<HttpResponse>} A future result for the response
      */
-    public putJsonAsync(url: Uri, value: any, jsonReplacer?: (key: string, value: any) => any, token?: cancellation.CancellationToken): promises.Promise<HttpResponse>;
+    public putJsonAsync(url: Uri, value: any, jsonReplacer?: (key: string, value: any) => any, token?: promises.CancellationToken): promises.Promise<HttpResponse>;
 
-    public putJsonAsync(url: any, value: any, jsonReplacer?, token?: cancellation.CancellationToken): promises.Promise<HttpResponse> {
+    public putJsonAsync(url: any, value: any, jsonReplacer?, token?: promises.CancellationToken): promises.Promise<HttpResponse> {
         var request = new HttpRequest("PUT", url);
         request.body = JSON.stringify(value, jsonReplacer);
         request.setRequestHeader("Content-Type", "application/json");
@@ -815,7 +725,7 @@ export class HttpClient {
      * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Promise<HttpResponse>} A future result for the response
      */
-    public deleteAsync(url: string, token?: cancellation.CancellationToken): promises.Promise<HttpResponse>;
+    public deleteAsync(url: string, token?: promises.CancellationToken): promises.Promise<HttpResponse>;
 
     /**
      * Gets the response from issuing an HTTP DELETE to the requested url
@@ -823,9 +733,9 @@ export class HttpClient {
      * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Promise<HttpResponse>} A future result for the response
      */
-    public deleteAsync(url: Uri, token?: cancellation.CancellationToken): promises.Promise<HttpResponse>;
+    public deleteAsync(url: Uri, token?: promises.CancellationToken): promises.Promise<HttpResponse>;
 
-    public deleteAsync(url: any, token?: cancellation.CancellationToken): promises.Promise<HttpResponse> {
+    public deleteAsync(url: any, token?: promises.CancellationToken): promises.Promise<HttpResponse> {
         return this.sendAsync(new HttpRequest("DELETE", url), token);
     }
 
@@ -835,16 +745,51 @@ export class HttpClient {
      * @param token {futures.CancellationToken} A token that can be used to cancel the request
      * @returns {futures.Promise<HttpResponse>} A future result for the response
      */
-    public sendAsync(request: HttpRequest, token?: cancellation.CancellationToken): promises.Promise<HttpResponse> {
+    public sendAsync(request: HttpRequest, token?: promises.CancellationToken): promises.Promise<HttpResponse> {
         if (this._closed) throw new Error("Object doesn't support this action");
 
+        // create a linked token
+        var cts = new promises.CancellationSource(token, this._cts.token);
+        if (this.timeout > 0) {
+            cts.cancelAfter(this.timeout);
+        }
+
+        var requestHeaders = (<any>request)._headers;
+        var clientHeaders = this._headers;
+
         return new promises.Promise<HttpResponse>(resolver => {
+            var xhr = new XMLHttpRequest();
+            var response = new HttpResponse(request, xhr);
 
-            // create a linked token
-            var cts = new cancellation.CancellationSource(this._cts.token, token);
+            var onload = e => {
+                cleanup();
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    resolver.fulfill(response);
+                }
+                else {
+                    resolver.reject(response);
+                }
+            };
 
-            // throw if we're already canceled, the promise will be rejected
-            cts.token.throwIfCanceled();
+            var onerror = e => {
+                cleanup();
+                resolver.reject(response);
+            };
+
+            var cleanup = () => {
+                xhr.removeEventListener("load", onload, false);
+                xhr.removeEventListener("error", onerror, false);
+                cts.token.unregister(handle);
+            };
+
+            var handle = cts.token.register(() => {
+                cleanup();
+                xhr.abort();
+            });
+
+            if (this.withCredentials) {
+                xhr.withCredentials = true;
+            }
 
             // normalize the uri
             var url: Uri = null;
@@ -855,74 +800,10 @@ export class HttpClient {
                 if (!this.baseUrl) throw new Error("Invalid argument: request");
                 url = new Uri(this.baseUrl, request.url);
             }
-                
+            
             if (url) {
                 request.url = url;
             }
-
-            var xhr = new XMLHttpRequest();
-            var response = new HttpResponse(request, xhr);
-            var requestHeaders = (<any>request)._headers;
-            var clientHeaders = this._headers;
-
-            // create the onload callback
-            var onload = e => {
-                cleanup();
-
-                // catch a cancellation and reject the promise
-                try {
-                    cts.token.throwIfCanceled();
-                }
-                catch (e) {
-                    resolver.reject(e);
-                    return;
-                }
-                
-                if (xhr.status >= 200 && xhr.status < 300) {
-                    resolver.fulfill(response);
-                }
-                else {
-                    resolver.reject(response);
-                }
-            };
-
-            // create the onerror callback
-            var onerror = e => {
-                cleanup();
-
-                // catch a cancellation and reject the promise
-                try {
-                    cts.token.throwIfCanceled();
-                }
-                catch (e) {
-                    resolver.reject(e);
-                    return;
-                }
-
-                resolver.reject(response);
-            };
-
-            // register a cleanup phase
-            var handle = cts.token.register(() => {
-                cleanup();
-
-                // abort the xhr
-                xhr.abort();
-
-                // catch a cancellation and reject the promise
-                try {
-                    cts.token.throwIfCanceled();
-                }
-                catch (e) {
-                    resolver.reject(e);
-                }
-            });
-
-            var cleanup = () => {
-                xhr.removeEventListener("load", onload, false);
-                xhr.removeEventListener("error", onerror, false);
-                cts.token.unregister(handle);
-            };
 
             // add the headers from the client
             Object.getOwnPropertyNames(clientHeaders).forEach(key => {
@@ -938,152 +819,13 @@ export class HttpClient {
             xhr.addEventListener("load", onload, false);
             xhr.addEventListener("error", onerror, false);
 
-            // enable credentials if requested
-            if (this.withCredentials) {
-                xhr.withCredentials = true;
-            }
-
-            // attach a timeout
-            if (this.timeout > 0) {
-                cts.cancelAfter(this.timeout);
-                xhr.timeout = this.timeout;
-            }
-
             // send the request
             xhr.open(request.method, request.url.toString(), true, this.username, this.password);
             xhr.send(request.body);
-        });
-    }
-
-    public getJsonpAsync<T>(url: Uri, callbackArg: string = "callback", noCache: boolean = false, token?: cancellation.CancellationToken): promises.Promise<T>;
-    public getJsonpAsync<T>(url: string, callbackArg: string = "callback", noCache: boolean = false, token?: cancellation.CancellationToken): promises.Promise<T>;
-    public getJsonpAsync<T>(url: any, callbackArg: string = "callback", noCache: boolean = false, token?: cancellation.CancellationToken): promises.Promise<T> {
-        if (this._closed) throw new Error("Object doesn't support this action");
-
-        return new promises.Promise<T>(resolver => {
-            // create a linked token
-            var cts = new cancellation.CancellationSource(this._cts.token, token);
-
-            // throw if we're already canceled, the promise will be rejected
-            cts.token.throwIfCanceled();
-
-            // normalize the uri
-            var requestUrl: Uri = null;
-            if (!url) {
-                requestUrl = this.baseUrl;
-            }
-            else {
-                requestUrl = new Uri(url);
-                if (!requestUrl.absolute) {
-                    if (!this.baseUrl) throw new Error("Invalid argument: url");
-                    requestUrl = new Uri(this.baseUrl, requestUrl);
-                }
-            }
-
-            var index = jsonpRequestIndex++;
-            var name = "__Promise__jsonp__" + index;
-            var query = QueryString.parse(requestUrl.search);
-            query[callbackArg] = name;
-            if (noCache) {
-                query["_t"] = Date.now();
-            }
-            
-            requestUrl.search = QueryString.stringify(query);
-
-            var pending = true;
-            var head = document.getElementsByTagName("head")[0];
-            var script = <HTMLScriptElement>document.createElement("script");
-            script.type = "text/javascript";
-            script.async = true;
-            script.src = requestUrl.toString();
-            
-            // checks whether the request has been canceled
-            var checkCanceled = () => {
-                try {
-                    cts.token.throwIfCanceled();
-                }
-                catch (e) {
-                    resolver.reject(e);
-                    return true;
-                }
-
-                return false;
-            }
-
-            // waits for the result
-            var onload = result => {
-                ignore();
-                cts.token.unregister(handle);
-                if (!checkCanceled()) {
-                    resolver.fulfill(result);
-                }
-            }
-
-            // ignores further calls to fulfill the result
-            var ignore = () => {
-                pending = false;
-                delete window[name];
-                disconnect();
-            }
-
-            // disconnects the script node
-            var disconnect = () => {
-                if (script.parentNode) {
-                    head.removeChild(script);
-                }
-            }
-
-            // register a cleanup phase
-            var handle = cts.token.register(() => {                
-                if (pending) {
-                    window[name] = ignore;
-                }
-
-                disconnect();
-                checkCanceled();
-            });
-            
-            // set a timeout before we no longer care about the result.
-            if (this.timeout) {
-                cts.cancelAfter(this.timeout);
-            }
-
-            window[name] = onload;
-            head.appendChild(script);
-        });
+        }, cts.token);
     }
 }
-
-/**
- * An error raised during an http request
- */
-export class HttpError implements Error {
-    public name: string = "HttpError";
-
-    /**
-     * Initializes a new instance of the HttpError class
-     * @param httpClient The HttpClient that initiated the request
-     * @param response The HttpResponse for the error
-     * @param message The message for the error.
-     */    
-    constructor(
-        /**
-         * Gets the HttpClient that initiated the request
-         */
-        public httpClient: HttpClient,
-
-        /**
-         * Gets the HttpResponse for the error
-         */
-        public response: HttpResponse,
-
-        public message: string = "An error occurred while processing your request") {
-    }
-}
-
-<any>HttpError.prototype = Object.create(Error.prototype);
 
 var UriParser = /^((?:(https?:)\/\/)(?:[^:@]*(?:\:[^@]*)?@)?(([a-z\d-\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF\.]+)(?:\:(\d+))?)?)?(?![a-z\d-]+\:)((?:^|\/)[^\?\#]*)?(\?[^#]*)?(#.*)?$/i;
 var UriParts = { "protocol": 2, "hostname": 4, "port": 5, "pathname": 6, "search": 7, "hash": 8 };
 var UriPorts = { "http:": 80, "https:": 443 };
-var jsonpRequestIndex = 0;

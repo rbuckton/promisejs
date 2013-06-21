@@ -19,12 +19,12 @@
                     .replace(/\\+|\/+/g, "/")
                     .replace(/^\.\/|\/\.(\/)/g, "$1");
                 return global[name]; 
-            }, global["httpclient"] = { });
+            }, global["httpclient-lite"] = { });
     }
 })
 (function (require, exports) {
     var cancellation = require("./cancellation");
-    var promises = require("./promises");
+    var promises = require("./promises-lite");
     
     var Uri = (function () {
         function Uri() {

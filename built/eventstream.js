@@ -6,7 +6,7 @@
  */
 (function (definition, global) {
     if (typeof define === "function" && define.amd) {
-        define(["require", "exports", "./futures"], definition);
+        define(["require", "exports", "./promises"], definition);
     }
     else if (typeof require === "function" && typeof exports === "object" && typeof module === "object") {
         definition(require, module["exports"] || exports);
@@ -23,7 +23,7 @@
     }
 })
 (function (require, exports) {
-    var futures = require("./futures");
+    var promises = require("./promises");
     
     var linkedlist;
     (function (linkedlist) {
@@ -97,8 +97,8 @@
         function EventSource() {
             throw new TypeError("Object doesn't support this action");
         }
-        EventSource.prototype.accept = function (value) {
-            this._eventData.accept(value);
+        EventSource.prototype.fulfill = function (value) {
+            this._eventData.fulfill(value);
         };
     
         EventSource.prototype.resolve = function (value, token) {
@@ -128,7 +128,7 @@
         function EventStream(init, token) {
             var source = Object.create(EventSource.prototype);
             var data = new EventData(this, source, token);
-            source.accept = source.accept.bind(source);
+            source.fulfill = source.fulfill.bind(source);
             source.resolve = source.resolve.bind(source);
             source.reject = source.reject.bind(source);
             source.close = source.close.bind(source);
@@ -144,15 +144,15 @@
         };
     
         EventStream.once = function (value, token) {
-            var cts = new futures.CancellationSource(token);
+            var cts = new promises.CancellationSource(token);
             return new EventStream(function (source) {
-                if (futures.Future.isFuture(value)) {
+                if (promises.Promise.isPromise(value)) {
                     value.done(function (value) {
-                        source.accept(value);
+                        source.fulfill(value);
                         source.close();
                     }, source.reject, cts.cancel, cts.token);
                 } else {
-                    source.accept(value);
+                    source.fulfill(value);
                     source.close();
                 }
             }, cts.token);
@@ -165,19 +165,19 @@
         };
     
         EventStream.repeat = function (count, value, token) {
-            var cts = new futures.CancellationSource(token);
+            var cts = new promises.CancellationSource(token);
             return new EventStream(function (source) {
-                if (futures.Future.isFuture(value)) {
+                if (promises.Promise.isPromise(value)) {
                     value.done(function (value) {
                         while (count--) {
-                            source.accept(value);
+                            source.fulfill(value);
                         }
     
                         source.close();
                     }, source.reject, cts.cancel, cts.token);
                 } else {
                     while (count-- > 0) {
-                        source.accept(value);
+                        source.fulfill(value);
                     }
     
                     source.close();
@@ -194,7 +194,7 @@
         EventStream.prototype.map = function (projection, thisArg, token) {
             var _this = this;
             var index = 0;
-            var cts = new futures.CancellationSource(token);
+            var cts = new promises.CancellationSource(token);
             return new EventStream(function (source) {
                 _this.listen(function (value) {
                     try  {
@@ -210,12 +210,12 @@
         EventStream.prototype.filter = function (predicate, thisArg, token) {
             var _this = this;
             var index = 0;
-            var cts = new futures.CancellationSource(token);
+            var cts = new promises.CancellationSource(token);
             return new EventStream(function (source) {
                 _this.listen(function (value) {
                     try  {
                         if (predicate.call(thisArg, value, index++, _this)) {
-                            source.accept(value);
+                            source.fulfill(value);
                         }
                     } catch (e) {
                         source.reject(e);
@@ -240,7 +240,7 @@
                 initialValue = args[0];
                 token = args[1];
             } else if (args.length == 1) {
-                if (args[0] instanceof futures.CancellationToken) {
+                if (args[0] instanceof promises.CancellationToken) {
                     token = args[0];
                 } else {
                     hasValue = true;
@@ -249,8 +249,8 @@
             }
     
             var index = 0;
-            var cts = new futures.CancellationSource(token);
-            return new futures.Future(function (resolver) {
+            var cts = new promises.CancellationSource(token);
+            return new promises.Promise(function (resolver) {
                 var accumulator;
                 if (hasValue) {
                     accumulator = initialValue;
@@ -289,7 +289,7 @@
                 initialValue = args[0];
                 token = args[1];
             } else if (args.length == 1) {
-                if (args[0] instanceof futures.CancellationToken) {
+                if (args[0] instanceof promises.CancellationToken) {
                     token = args[0];
                 } else {
                     hasValue = true;
@@ -298,9 +298,9 @@
             }
     
             var index = 0;
-            var cts = new futures.CancellationSource(token);
+            var cts = new promises.CancellationSource(token);
             var values = [];
-            return new futures.Future(function (resolver) {
+            return new promises.Promise(function (resolver) {
                 var accumulator;
                 if (hasValue) {
                     accumulator = initialValue;
@@ -333,8 +333,8 @@
         EventStream.prototype.first = function (predicate, thisArg, token) {
             var _this = this;
             var index = 0;
-            var cts = new futures.CancellationSource(token);
-            return new futures.Future(function (resolver) {
+            var cts = new promises.CancellationSource(token);
+            return new promises.Promise(function (resolver) {
                 _this.listen(function (value) {
                     try  {
                         if (!predicate || predicate.call(thisArg, value, index++, _this)) {
@@ -356,8 +356,8 @@
             var result;
             var hasValue = false;
             var index = 0;
-            var cts = new futures.CancellationSource(token);
-            return new futures.Future(function (resolver) {
+            var cts = new promises.CancellationSource(token);
+            return new promises.Promise(function (resolver) {
                 _this.listen(function (value) {
                     try  {
                         if (!predicate || predicate.call(thisArg, value, index++, _this)) {
@@ -381,8 +381,8 @@
         EventStream.prototype.some = function (predicate, thisArg, token) {
             var _this = this;
             var index = 0;
-            var cts = new futures.CancellationSource(token);
-            return new futures.Future(function (resolver) {
+            var cts = new promises.CancellationSource(token);
+            return new promises.Promise(function (resolver) {
                 _this.listen(function (value) {
                     try  {
                         if (!predicate || predicate.call(thisArg, value, index++, _this)) {
@@ -402,8 +402,8 @@
         EventStream.prototype.every = function (predicate, thisArg, token) {
             var _this = this;
             var index = 0;
-            var cts = new futures.CancellationSource(token);
-            return new futures.Future(function (resolver) {
+            var cts = new promises.CancellationSource(token);
+            return new promises.Promise(function (resolver) {
                 _this.listen(function (value) {
                     try  {
                         if (!predicate.call(thisArg, value, index++, _this)) {
@@ -424,8 +424,8 @@
             var _this = this;
             var index = 0;
             var count = 0;
-            var cts = new futures.CancellationSource(token);
-            return new futures.Future(function (resolver) {
+            var cts = new promises.CancellationSource(token);
+            return new promises.Promise(function (resolver) {
                 _this.listen(function (value) {
                     try  {
                         if (!predicate || predicate.call(thisArg, value, index++, _this)) {
@@ -443,13 +443,13 @@
     
         EventStream.prototype.skip = function (count, token) {
             var _this = this;
-            var cts = new futures.CancellationSource(token);
+            var cts = new promises.CancellationSource(token);
             return new EventStream(function (source) {
                 _this.listen(function (value) {
                     if (count > 0) {
                         count--;
                     } else {
-                        source.accept(value);
+                        source.fulfill(value);
                     }
                 }, source.reject, source.close, cts.cancel, cts.token);
             }, cts.token);
@@ -457,12 +457,12 @@
     
         EventStream.prototype.take = function (count, token) {
             var _this = this;
-            var cts = new futures.CancellationSource(token);
+            var cts = new promises.CancellationSource(token);
             return new EventStream(function (source) {
                 _this.listen(function (value) {
                     if (count > 0) {
                         count--;
-                        source.accept(value);
+                        source.fulfill(value);
                     } else {
                         source.close();
                         cts.cancel();
@@ -475,13 +475,13 @@
             var _this = this;
             var done = false;
             var index = 0;
-            var cts = new futures.CancellationSource(token);
+            var cts = new promises.CancellationSource(token);
             return new EventStream(function (source) {
                 _this.listen(function (value) {
                     try  {
                         done = done || !predicate.call(thisArg, value, index++, _this);
                         if (done) {
-                            source.accept(value);
+                            source.fulfill(value);
                         }
                     } catch (e) {
                         source.reject(e);
@@ -495,12 +495,12 @@
         EventStream.prototype.takeWhile = function (predicate, thisArg, token) {
             var _this = this;
             var index = 0;
-            var cts = new futures.CancellationSource(token);
+            var cts = new promises.CancellationSource(token);
             return new EventStream(function (source) {
                 _this.listen(function (value) {
                     try  {
                         if (predicate.call(thisArg, value, index++, _this)) {
-                            source.accept(value);
+                            source.fulfill(value);
                         } else {
                             source.close();
                             cts.cancel();
@@ -516,7 +516,7 @@
         EventStream.prototype.skipUntil = function (future, token) {
             var _this = this;
             var done = false;
-            var cts = new futures.CancellationSource(token);
+            var cts = new promises.CancellationSource(token);
             return new EventStream(function (source) {
                 future.done(function () {
                     done = true;
@@ -527,7 +527,7 @@
     
                 _this.listen(function (value) {
                     if (done) {
-                        source.accept(value);
+                        source.fulfill(value);
                     }
                 }, function (e) {
                     source.reject(e);
@@ -541,7 +541,7 @@
     
         EventStream.prototype.takeUntil = function (future, token) {
             var _this = this;
-            var cts = new futures.CancellationSource(token);
+            var cts = new promises.CancellationSource(token);
             return new EventStream(function (source) {
                 future.done(function () {
                     source.close();
@@ -550,7 +550,7 @@
                     cts.cancel();
                 }, cts.cancel, cts.token);
     
-                _this.listen(source.accept, function (e) {
+                _this.listen(source.fulfill, function (e) {
                     source.reject(e);
                     cts.cancel();
                 }, function () {
@@ -562,7 +562,7 @@
     
         EventStream.prototype.zip = function (other, projection, thisArg, token) {
             var _this = this;
-            var cts = new futures.CancellationSource(token);
+            var cts = new promises.CancellationSource(token);
             var index = 0;
             var left = [];
             var right = [];
@@ -578,7 +578,7 @@
                     } else {
                         try  {
                             var result = projection.call(thisArg, value, right.shift(), index++, _this, other);
-                            source.accept(result);
+                            source.fulfill(result);
                         } catch (e) {
                             source.reject(e);
                             cts.cancel();
@@ -598,7 +598,7 @@
                     } else {
                         try  {
                             var result = projection.call(thisArg, left.shift(), value, index++, _this, other);
-                            source.accept(result);
+                            source.fulfill(result);
                         } catch (e) {
                             source.reject(e);
                             cts.cancel();
@@ -616,7 +616,7 @@
     
         EventStream.prototype.throttle = function (delay, token) {
             var _this = this;
-            var cts = new futures.CancellationSource(token);
+            var cts = new promises.CancellationSource(token);
             return new EventStream(function (source) {
                 var pending = false;
                 var state;
@@ -625,10 +625,10 @@
                 var request = function () {
                     if (!pending) {
                         pending = true;
-                        futures.Scheduler.current.post(function () {
+                        promises.Scheduler.current.post(function () {
                             pending = false;
                             if (state === EventState.sending) {
-                                source.accept(last);
+                                source.fulfill(last);
                                 hasLast = false;
                                 last = null;
                             } else if (state === EventState.rejected) {
@@ -638,7 +638,7 @@
                                 cts.cancel();
                             } else if (state === EventState.closed) {
                                 if (hasLast) {
-                                    source.accept(last);
+                                    source.fulfill(last);
                                     hasLast = false;
                                     last = null;
                                 }
@@ -671,8 +671,8 @@
         EventStream.prototype.toArray = function (token) {
             var _this = this;
             var values = [];
-            var cts = new futures.CancellationSource(token);
-            return new futures.Future(function (resolver) {
+            var cts = new promises.CancellationSource(token);
+            return new promises.Promise(function (resolver) {
                 _this.listen(function (value) {
                     values.push(value);
                 }, function (e) {
@@ -703,7 +703,7 @@
                 });
             }
         }
-        EventData.prototype.accept = function (value, synchronous) {
+        EventData.prototype.fulfill = function (value, synchronous) {
             if (this.state > EventState.sending) {
                 return;
             }
@@ -724,8 +724,8 @@
                 return;
             }
     
-            if (futures.Future.isFuture(value)) {
-                var cts = new futures.CancellationSource(this.token, token);
+            if (promises.Promise.isPromise(value)) {
+                var cts = new promises.CancellationSource(this.token, token);
                 if (!this.pending) {
                     this.pending = {};
                 }
@@ -758,13 +758,13 @@
                 return;
             }
     
-            this.accept(value, synchronous);
+            this.fulfill(value, synchronous);
         };
     
         EventData.prototype.merge = function (stream, token) {
             var _this = this;
             stream.listen(function (value) {
-                _this.accept(value, true);
+                _this.fulfill(value, true);
             }, function (e) {
                 _this.reject(e, true);
             }, null, null, this.token);
@@ -937,7 +937,7 @@
     
                         var callback = node.value.callback, token = node.value.token;
                         if (!(token && token.canceled)) {
-                            futures.Scheduler.current.post(callback.bind(null, result), { synchronous: synchronous }, token);
+                            promises.Scheduler.current.post(callback.bind(null, result), { synchronous: synchronous }, token);
                         }
     
                         node = next;

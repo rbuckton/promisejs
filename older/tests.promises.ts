@@ -5,203 +5,203 @@
  * https://github.com/rbuckton/promisejs/raw/master/LICENSE
  * 
  */
-import futures = module("futures");
+import promises = module("promises");
 import assert = module("assert");
 
 export var name = "tests.futures";
 
 export function Future_accept_value() {
-    futures.Future.accept(1).done(
+    promises.Promise.fulfill(1).done(
         v => assert.equal(v, 1),
         assert.ifError);
 }
 
 export function Future_accept_Future() {
-    var F = futures.Future.accept(1);
-    futures.Future.accept(F).done(
+    var F = promises.Promise.fulfill(1);
+    promises.Promise.fulfill(F).done(
         v => assert.equal(v, F),
         assert.ifError);
 }
 
 export function Future_resolve_value() {
-    futures.Future.resolve(1).done(
+    promises.Promise.resolve(1).done(
         v => assert.equal(v, 1),
         assert.ifError)
 }
 
 export function Future_resolve_Future() {
-    var F = futures.Future.accept(1);
-    futures.Future.resolve(F).done(
+    var F = promises.Promise.fulfill(1);
+    promises.Promise.resolve(F).done(
         v => assert.equal(v, 1),
         assert.ifError);
 }
 
 export function Future_resolve_FutureFuture() {
-    var F = futures.Future.accept(1);
-    var FF = futures.Future.accept(F);
-    futures.Future.resolve(FF).done(
+    var F = promises.Promise.fulfill(1);
+    var FF = promises.Promise.fulfill(F);
+    promises.Promise.resolve(FF).done(
         v => assert.equal(v, F),
         assert.ifError);
 }
 
 export function Future_reject_value() {
-    futures.Future.reject("error").done(
+    promises.Promise.reject("error").done(
         assert.ifError,
         e => assert.equal(e, "error"));
 }
 
 export function Future_reject_Future() {
-    var F = futures.Future.accept("error");
-    futures.Future.reject(F).done(
+    var F = promises.Promise.fulfill("error");
+    promises.Promise.reject(F).done(
         assert.ifError,
         e => assert.equal(e, F));
 }
 
 export function FutureResolver_accept_value() {
-    new futures.Future<number>(resolver => resolver.accept(1)).done(
+    new promises.Promise<number>(resolver => resolver.fulfill(1)).done(
         v => assert.equal(v, 1),
         assert.ifError);
 }
 
 export function FutureResolver_accept_Future() {
-    var F = futures.Future.accept(1);
-    new futures.Future<futures.Future<number>>(resolver => resolver.accept(F)).done(
+    var F = promises.Promise.fulfill(1);
+    new promises.Promise<promises.Promise<number>>(resolver => resolver.fulfill(F)).done(
         v => assert.equal(v, F),
         assert.ifError);
 }
 
 export function FutureResolver_resolve_value() {
-    new futures.Future<number>(resolver => resolver.resolve(1)).done(
+    new promises.Promise<number>(resolver => resolver.resolve(1)).done(
         v => assert.equal(v, 1),
         assert.ifError);
 }
 
 export function FutureResolver_resolve_Future() {
-    var F = futures.Future.accept(1);
-    new futures.Future<number>(resolver => resolver.resolve(F)).done(
+    var F = promises.Promise.fulfill(1);
+    new promises.Promise<number>(resolver => resolver.resolve(F)).done(
         v => assert.equal(v, 1),
         assert.ifError);
 }
 
 export function FutureResolver_resolve_FutureFuture() {
-    var F = futures.Future.accept(1);
-    var FF = futures.Future.accept(F);
-    new futures.Future<futures.Future<number>>(resolver => resolver.resolve(FF)).done(
+    var F = promises.Promise.fulfill(1);
+    var FF = promises.Promise.fulfill(F);
+    new promises.Promise<promises.Promise<number>>(resolver => resolver.resolve(FF)).done(
         v => assert.equal(v, F),
         assert.ifError);
 }
 
 export function FutureResolver_reject_value() {
-    new futures.Future<void>(resolver => resolver.reject("error")).done(
+    new promises.Promise<void>(resolver => resolver.reject("error")).done(
         assert.ifError,
         e => assert.equal(e, "error"))
 }
 
 export function FutureResolver_reject_Future() {
-    var F = futures.Future.accept("error");
-    new futures.Future<void>(resolver => resolver.reject(F)).done(
+    var F = promises.Promise.fulfill("error");
+    new promises.Promise<void>(resolver => resolver.reject(F)).done(
         assert.ifError,
         e => assert.equal(e, F))
 }
 
 export function Future_accept_value_then() {
-    futures.Future.accept(1).then(v => v).done(
+    promises.Promise.fulfill(1).then(v => v).done(
         v => assert.equal(v, 1),
         assert.ifError);
 }
 
 export function Future_accept_value_then_throw() {
-    futures.Future.accept(1).then(v => { throw "error" }).done(
+    promises.Promise.fulfill(1).then(v => { throw "error" }).done(
         assert.ifError,
         e => assert.equal(e, "error"));
 }
 
 export function Future_accept_Future_then_none() {
-    var F = futures.Future.accept(1);
-    futures.Future.accept(F).then().done(
+    var F = promises.Promise.fulfill(1);
+    promises.Promise.fulfill(F).then().done(
         v => assert.equal(v, F),
         assert.ifError);
 }
 
 export function Future_accept_Future_then_idish() {
-    var F = futures.Future.accept(1);
-    futures.Future.accept(F).then(v => v).done(
+    var F = promises.Promise.fulfill(1);
+    promises.Promise.fulfill(F).then(v => v).done(
         v => assert.equal(v, 1),
         assert.ifError);
 }
 
 export function Future_accept_FutureFuture_then() {
-    var F = futures.Future.accept(1);
-    var FF = futures.Future.accept(F);
-    futures.Future.accept(FF).then(v => v).done(
+    var F = promises.Promise.fulfill(1);
+    var FF = promises.Promise.fulfill(F);
+    promises.Promise.fulfill(FF).then(v => v).done(
         v => assert.equal(v, F),
         assert.ifError);
 }
 
 export function Future_accept_Future_then_accept() {
-    var F = futures.Future.accept(1);
-    futures.Future.accept(F).then(v => futures.Future.accept(v)).done(
+    var F = promises.Promise.fulfill(1);
+    promises.Promise.fulfill(F).then(v => promises.Promise.fulfill(v)).done(
         v => assert.equal(v, F),
         assert.ifError);
 }
 
 export function Future_accept_Future_then_resolve() {
-    var F = futures.Future.accept(1);
-    futures.Future.accept(F).then(v => futures.Future.resolve(v)).done(
+    var F = promises.Promise.fulfill(1);
+    promises.Promise.fulfill(F).then(v => promises.Promise.resolve(v)).done(
         v => assert.equal(v, 1),
         assert.ifError);
 }
 
 export function Future_accept_Future_then_reject() {
-    var F = futures.Future.accept(1);
-    futures.Future.accept(F).then(v => futures.Future.reject("error")).done(
+    var F = promises.Promise.fulfill(1);
+    promises.Promise.fulfill(F).then(v => promises.Promise.reject("error")).done(
         assert.ifError,
         e => assert.equal(e, "error"));
 }
 
 export function Future_resolve_value_then() {
-    futures.Future.resolve(1).then(v => v).done(
+    promises.Promise.resolve(1).then(v => v).done(
         v => assert.equal(v, 1),
         assert.ifError);
 }
 
 export function Future_resolve_Future_then() {
-    var F = futures.Future.accept(1);
-    futures.Future.resolve(F).then(v => v).done(
+    var F = promises.Promise.fulfill(1);
+    promises.Promise.resolve(F).then(v => v).done(
         v => assert.equal(v, 1),
         assert.ifError);
 }
 
 export function Future_resolve_FutureFuture_then() {
-    var F = futures.Future.accept(futures.Future.accept(1));
-    futures.Future.resolve(F).then(v => v).done(
+    var F = promises.Promise.fulfill(promises.Promise.fulfill(1));
+    promises.Promise.resolve(F).then(v => v).done(
         v => assert.equal(v, 1),
         assert.ifError);
 }
 
 export function Future_resolve_Future_then_accept() {
-    var F = futures.Future.accept(1);
-    futures.Future.resolve(F).then(v => futures.Future.accept(v)).done(
+    var F = promises.Promise.fulfill(1);
+    promises.Promise.resolve(F).then(v => promises.Promise.fulfill(v)).done(
         v => assert.equal(v, 1),
         assert.ifError);
 }
 
 export function Future_resolve_Future_then_resolve() {
-    var F = futures.Future.accept(1);
-    futures.Future.resolve(F).then(v => futures.Future.resolve(v)).done(
+    var F = promises.Promise.fulfill(1);
+    promises.Promise.resolve(F).then(v => promises.Promise.resolve(v)).done(
         v => assert.equal(v, 1),
         assert.ifError);
 }
 
 export function Future_resolve_Future_then_reject() {
-    var F = futures.Future.accept(1);
-    futures.Future.resolve(F).then(v => futures.Future.reject("error")).done(
+    var F = promises.Promise.fulfill(1);
+    promises.Promise.resolve(F).then(v => promises.Promise.reject("error")).done(
         assert.ifError,
         e => assert.equal(e, "error"));
 }
 
 export function Future_reject_value_then_resolve() {
-    futures.Future.reject("error")
+    promises.Promise.reject("error")
         .then(null, e => 1)
         .done(
             v => assert.equal(v, 1),
@@ -209,9 +209,9 @@ export function Future_reject_value_then_resolve() {
 }
 
 export function any_accept1_reject1() {        
-    var F0 = futures.Future.accept(1);
-    var F1 = futures.Future.reject("error");        
-    futures.Future
+    var F0 = promises.Promise.fulfill(1);
+    var F1 = promises.Promise.reject("error");        
+    promises.Promise
         .any(F0, F1)
         .done(
             v => assert.equal(v, 1),
@@ -219,9 +219,9 @@ export function any_accept1_reject1() {
 }
 
 export function any_reject1_accept1() {
-    var F0 = futures.Future.reject("error");
-    var F1 = futures.Future.accept(1);
-    futures.Future
+    var F0 = promises.Promise.reject("error");
+    var F1 = promises.Promise.fulfill(1);
+    promises.Promise
         .any(F0, F1)
         .done(
             assert.ifError,
@@ -229,9 +229,9 @@ export function any_reject1_accept1() {
 }
 
 export function any_reject2() {
-    var F0 = futures.Future.reject("error0");
-    var F1 = futures.Future.reject("error1");
-    futures.Future
+    var F0 = promises.Promise.reject("error0");
+    var F1 = promises.Promise.reject("error1");
+    promises.Promise
         .any(F0, F1)
         .done(
             assert.ifError,
@@ -239,9 +239,9 @@ export function any_reject2() {
 }
 
 export function any_accept2() {
-    var F0 = futures.Future.accept(1);
-    var F1 = futures.Future.accept(2);
-    futures.Future
+    var F0 = promises.Promise.fulfill(1);
+    var F1 = promises.Promise.fulfill(2);
+    promises.Promise
         .any(F0, F1)
         .done(
             v => assert.equal(v, 1),
@@ -249,15 +249,15 @@ export function any_accept2() {
 }
 
 export function any_none() {
-    futures.Future.any().done(
+    promises.Promise.any().done(
         v => assert.ok(v === undefined),
         assert.ifError);
 }
 
 export function some_accept1_reject1() {        
-    var F0 = futures.Future.accept(1);
-    var F1 = futures.Future.reject("error");
-    futures.Future
+    var F0 = promises.Promise.fulfill(1);
+    var F1 = promises.Promise.reject("error");
+    promises.Promise
         .some(F0, F1)
         .done(
             v => assert.equal(v, 1),
@@ -265,9 +265,9 @@ export function some_accept1_reject1() {
 }
 
 export function some_reject1_accept1() { 
-    var F0 = futures.Future.accept(1);
-    var F1 = futures.Future.reject("error");
-    futures.Future
+    var F0 = promises.Promise.fulfill(1);
+    var F1 = promises.Promise.reject("error");
+    promises.Promise
         .some(F1, F0)
         .done(
             v => assert.equal(v, 1),
@@ -275,9 +275,9 @@ export function some_reject1_accept1() {
 }
 
 export function some_reject2() {
-    var F0 = futures.Future.reject("error0");
-    var F1 = futures.Future.reject("error1");
-    futures.Future
+    var F0 = promises.Promise.reject("error0");
+    var F1 = promises.Promise.reject("error1");
+    promises.Promise
         .some(F0, F1)
         .done(
             assert.ifError,
@@ -289,15 +289,15 @@ export function some_reject2() {
 }
 
 export function some_none() {
-    futures.Future.some().done(
+    promises.Promise.some().done(
         v => assert.ok(v === undefined),
         assert.ifError);
 }
 
 export function every_accept1_reject1() {
-    var F0 = futures.Future.accept(1);
-    var F1 = futures.Future.reject("error");
-    futures.Future
+    var F0 = promises.Promise.fulfill(1);
+    var F1 = promises.Promise.reject("error");
+    promises.Promise
         .every(F0, F1)
         .done(
             assert.ifError,
@@ -305,9 +305,9 @@ export function every_accept1_reject1() {
 }
 
 export function every_accept2() {
-    var F0 = futures.Future.accept(1);
-    var F1 = futures.Future.accept(2);
-    futures.Future
+    var F0 = promises.Promise.fulfill(1);
+    var F1 = promises.Promise.fulfill(2);
+    promises.Promise
         .every(F0, F1)
         .done(
             v => assert.ok(Array.isArray(v) && v[0] == 1 && v[1] == 2),
@@ -315,9 +315,9 @@ export function every_accept2() {
 }
 
 export function every_reject2() {
-    var F0 = futures.Future.reject("error0");
-    var F1 = futures.Future.reject("error1");
-    futures.Future
+    var F0 = promises.Promise.reject("error0");
+    var F1 = promises.Promise.reject("error1");
+    promises.Promise
         .every(F0, F1)
         .done(
             assert.ifError,
@@ -325,15 +325,15 @@ export function every_reject2() {
 }
 
 export function every_none() {
-    futures.Future.every().done(
+    promises.Promise.every().done(
         v => assert.ok(v === undefined),
         assert.ifError);
 }
 
 export function FutureFutureFuture_then_then_done() {
-    var F = futures.Future.accept(1);
-    var FF = futures.Future.accept(F);
-    var FFF = futures.Future.accept(FF);
+    var F = promises.Promise.fulfill(1);
+    var FF = promises.Promise.fulfill(F);
+    var FFF = promises.Promise.fulfill(FF);
     FFF.then().then().done(
         v => assert.equal(v, FF),
         assert.ifError);
@@ -341,7 +341,7 @@ export function FutureFutureFuture_then_then_done() {
 
 export function FutureForThenable_accept() {
     var T = { then: function() { assert.ok(false, "should not be called") } };
-    var F = futures.Future.accept(T);
+    var F = promises.Promise.fulfill(T);
     F.done(
         v => assert.equal(v, T),
         assert.ifError);
@@ -349,7 +349,7 @@ export function FutureForThenable_accept() {
 
 export function FutureForThenable_resolve() {
     var T = { then: function() { assert.ok(false, "should not be called") } };
-    var F = futures.Future.resolve(T);
+    var F = promises.Promise.resolve(T);
     F.done(
         v => assert.equal(v, T),
         assert.ifError);
@@ -357,8 +357,8 @@ export function FutureForThenable_resolve() {
 
 export function FutureForAssimilatedThenable_accept() {
     var T = { then: function(resolve, reject) { resolve(1); } }
-    var F = futures.Future.from(T);
-    var FF = futures.Future.accept(F);
+    var F = promises.Promise.from(T);
+    var FF = promises.Promise.fulfill(F);
     FF.done(
         v => assert.equal(v, F),
         assert.ifError);
@@ -366,8 +366,8 @@ export function FutureForAssimilatedThenable_accept() {
 
 export function FutureForAssimilatedThenable_resolve() {
     var T = { then: function(resolve, reject) { resolve(1); } }
-    var F = futures.Future.from(T);
-    var FF = futures.Future.resolve(F);
+    var F = promises.Promise.from(T);
+    var FF = promises.Promise.resolve(F);
     FF.done(
         v => assert.equal(v, 1),
         assert.ifError);
@@ -376,8 +376,8 @@ export function FutureForAssimilatedThenable_resolve() {
 export function FutureForAssimilatedNestedThenable_accept() {
     var T1 = { then: function(resolve, reject) { resolve(1); } }
     var T2 = { then: function(resolve, reject) { resolve(T1); } }
-    var F = futures.Future.from(T2);
-    var FF = futures.Future.accept(F);
+    var F = promises.Promise.from(T2);
+    var FF = promises.Promise.fulfill(F);
     FF.done(
         v => assert.equal(v, F),
         assert.ifError);
@@ -386,17 +386,17 @@ export function FutureForAssimilatedNestedThenable_accept() {
 export function FutureForAssimilatedNestedThenable_resolve() {
     var T1 = { then: function(resolve, reject) { resolve(1); } }
     var T2 = { then: function(resolve, reject) { resolve(T1); } }
-    var F = futures.Future.from(T2);
-    var FF = futures.Future.resolve(F);
+    var F = promises.Promise.from(T2);
+    var FF = promises.Promise.resolve(F);
     FF.done(
         v => assert.equal(v, 1),
         assert.ifError);
 }
 
 export function Cancel_Future() {
-    var C = new futures.CancellationSource();
+    var C = new promises.CancellationSource();
     var R;
-    var F = new futures.Future(function(resolver) { R = resolver; }, C.token);
+    var F = new promises.Promise(function(resolver) { R = resolver; }, C.token);
     C.cancel();
     F.done(
         assert.ifError,
@@ -404,8 +404,8 @@ export function Cancel_Future() {
 }
 
 export function Cancel_Future_setTimeout() {
-    var C = new futures.CancellationSource();
-    var F = new futures.Future<number>(function (resolver) {
+    var C = new promises.CancellationSource();
+    var F = new promises.Promise<number>(function (resolver) {
         var timerId = setTimeout(() => {
             resolver.resolve(1);
             C.token.unregister(handle);

@@ -2,14 +2,12 @@
 import events = module("events");
 import assert = module("assert");
 import domain = module("domain");
-import tests_futures = module("tests.futures");
+import tests_promises = module("tests.promises");
 import tests_httpclient = module("tests.httpclient");
-import tests_eventstream = module("tests.eventstream");
 
 // needed to make sure TS doesn't optimize away the test
-var _tests_futures = tests_futures.name,
-    _tests_httpclient = tests_httpclient.name,
-    _tests_eventstream = tests_eventstream.name;
+var _tests_promises = tests_promises.name,
+    _tests_httpclient = tests_httpclient.name;
 
 class TestCase extends events.EventEmitter {
     public test: () => void;
@@ -107,4 +105,4 @@ class TestRun {
     }
 }
 
-TestRun.run([tests_futures, tests_httpclient, tests_eventstream]);
+TestRun.run([tests_promises, tests_httpclient]);

@@ -32,11 +32,10 @@
     var events = require("events");
     
     var domain = require("domain");
-    var tests_futures = require("./tests.futures");
+    var tests_promises = require("./tests.promises");
     var tests_httpclient = require("./tests.httpclient");
-    var tests_eventstream = require("./tests.eventstream");
     
-    var _tests_futures = tests_futures.name, _tests_httpclient = tests_httpclient.name, _tests_eventstream = tests_eventstream.name;
+    var _tests_promises = tests_promises.name, _tests_httpclient = tests_httpclient.name;
     
     var TestCase = (function (_super) {
         __extends(TestCase, _super);
@@ -133,5 +132,5 @@
         return TestRun;
     })();
     
-    TestRun.run([tests_futures, tests_httpclient, tests_eventstream]);
+    TestRun.run([tests_promises, tests_httpclient]);
 }, this);

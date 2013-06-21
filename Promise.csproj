@@ -1,0 +1,63 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <DefaultLanguageSourceExtension>.ts</DefaultLanguageSourceExtension>
+    <Language>Typescript</Language>
+    <DebugSymbols>false</DebugSymbols>
+    <DebugType>none</DebugType>
+    <SkipCopyBuildProduct>true</SkipCopyBuildProduct>
+    <ProjectGuid>{4226962E-4EEF-46E2-8E51-CB2A66EFD1FF}</ProjectGuid>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x86'">
+    <UseVSHostingProcess>false</UseVSHostingProcess>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include=".gitignore" />
+    <Content Include="built\eventstream.js" />
+    <Content Include="built\httpclient.js" />
+    <Content Include="built\lists.js" />
+    <Content Include="built\promisejs.js" />
+    <Content Include="built\promises-lite.js" />
+    <Content Include="built\promises.js" />
+    <Content Include="built\symbols.js" />
+    <Content Include="built\tasks.js" />
+    <Content Include="built\tests.eventstream.js" />
+    <Content Include="built\tests.httpclient.js" />
+    <Content Include="built\tests.js" />
+    <Content Include="built\tests.promises.js" />
+    <Content Include="lib\node.d.ts" />
+    <Content Include="lib\timers.d.ts" />
+    <Content Include="src\cancellation.ts" />
+    <Content Include="src\httpclient.ts" />
+    <Content Include="src\tests.promises.ts" />
+    <Content Include="older\eventstream.ts" />
+    <Content Include="older\httpclient.ts" />
+    <Content Include="src\promisejs.ts" />
+    <Content Include="src\promises.ts" />
+    <Content Include="older\promises.ts" />
+    <Content Include="older\tests.eventstream.ts" />
+    <Content Include="src\tests.httpclient.ts" />
+    <Content Include="older\tests.promises.ts" />
+    <Content Include="src\tests.ts" />
+    <Content Include="src\umd.js" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include=".npmignore" />
+    <None Include="Jakefile" />
+    <None Include="LICENSE" />
+    <None Include="package.json" />
+    <None Include="README.md" />
+  </ItemGroup>
+  <Target Name="Build">
+    <Exec Command="jake" />
+  </Target>
+  <Target Name="Clean">
+    <Exec Command="jake clean" />
+  </Target>
+  <Target Name="Rebuild">
+    <Exec Command="jake rebuild" />
+  </Target>
+  <Target Name="Test">
+    <Exec Command="jake test" />
+  </Target>
+</Project>

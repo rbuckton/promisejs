@@ -11,20 +11,20 @@ directory("built");
 
 var dirs = ["obj", "built"];
 
-var futures = {
-    target: "built/futures.js",
-    inputs: ["src/futures.ts"],
-    outputs: ["built/futures.js"],
+var promises = {
+    target: "built/promises.js",
+    inputs: ["src/promises.ts"],
+    outputs: ["built/promises.js"],
     opts: opts,
     deps: []
 };
 
-var eventstream = {
-    target: "built/eventstream.js",
-    inputs: ["src/eventstream.ts"],
-    outputs: ["built/eventstream.js"],
+var cancellation = {
+    target: "built/cancellation.js",
+    inputs: ["src/cancellation.ts"],
+    outputs: ["built/cancellation.js"],
     opts: opts,
-    deps: [futures]
+    deps: []
 };
 
 var httpclient = {
@@ -32,7 +32,7 @@ var httpclient = {
     inputs: ["src/httpclient.ts"],
     outputs: ["built/httpclient.js"],
     opts: opts,
-    deps: [futures]
+    deps: [promises, cancellation]
 };
 
 var tests = {
@@ -40,12 +40,11 @@ var tests = {
     inputs: ["src/tests.ts"],
     outputs: [
         "built/tests.js", 
-        "built/tests.futures.js",
+        "built/tests.promises.js",
         "built/tests.httpclient.js",
-        "built/tests.eventstream.js"
     ],
     opts: opts,
-    deps: [futures]
+    deps: [promises]
 }
 
 var promisejs = {
@@ -53,12 +52,12 @@ var promisejs = {
     inputs: ["src/promisejs.ts"],
     outputs: ["built/promisejs.js"],
     opts: { module: "commonjs", obj: "obj", experimental: true, comments: true },
-    deps: [futures, httpclient]
+    deps: [promises, cancellation, httpclient]
 }
 
 var modules = [
-    futures,
-    eventstream, 
+    promises,
+	cancellation,
     httpclient, 
     promisejs,
     tests
