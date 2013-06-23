@@ -63,7 +63,7 @@ fetchCPS("...",
   err => {/*handle err*/})
 ```
 
-If you need to peeform a large number of nested asynchronous calls, Continuation 
+If you need to perform a large number of nested asynchronous calls, Continuation 
 Passing Style can start to look complicated very quickly.
 
 With Promises, you might write:
