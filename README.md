@@ -60,13 +60,15 @@ fetchCPS("...",
       err => {
         /*handle err*/ 
       })},
-  err => {/*handle err*/})
+  err => {
+    /*handle err*/
+  })
 ```
 
 If you need to perform a large number of nested asynchronous calls, Continuation 
 Passing Style can start to look complicated very quickly.
 
-With Promises, you might write:
+With Promises you would instead write:
 
 ```js
 function fetchAsync(url) {
@@ -79,10 +81,10 @@ function fetchAsync(url) {
   });
 }
 
-var resP = fetchAsynx("...");
+var resP = fetchAsync("...");
 resP.then(res => {
       /*do something with res*/
-      return nextAsync(res)
+      return nextAsync(res);
     })
     .then(value => {
       /*do something with value*/
