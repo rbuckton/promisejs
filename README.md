@@ -27,7 +27,15 @@ function fetch(url) {
   return xhr.responseText;
 }
 
-var res = fetch("...")
+try {
+  var res = fetch("...");
+  /*do something with res*/
+  var value = next(res);
+  /*do something with value*/
+}
+catch(err) {
+  /*handle err*/
+}
 ```
 
 The above example has the unfortunate side effect of blocking the browser's UI thread until the resource is loaded.
